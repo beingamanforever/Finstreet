@@ -1,7 +1,7 @@
 import os
 import sys
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Optional
 
 import pandas as pd
@@ -20,6 +20,28 @@ class Config:
     commission: float = 0.0003
     slippage: float = 0.0005
     max_pos_pct: float = 0.10
+    use_trailing_stop: bool = True
+    trailing_atr_mult: float = 2.0
+
+
+@dataclass
+class TradeRecord:
+    """Detailed trade record for analysis."""
+    date: str
+    signal_type: str
+    entry: float
+    exit: float
+    qty: int
+    pnl: float
+    reason: str
+    confidence: float
+    edge: float
+    regime: str
+    adx: float = 0.0
+    risk_pct: float = 0.02
+    holding_bars: int = 1
+    max_favorable: float = 0.0  # Maximum favorable excursion
+    max_adverse: float = 0.0   # Maximum adverse excursion
 
 
 class Backtester:
@@ -28,17 +50,17 @@ class Backtester:
         self.capital = capital
         self.config = config or Config(capital=capital)
         self.strategy = Strategy(capital=capital)
-        self.trades: List[Dict] = []
+        self.trades: List[TradeRecord] = []
         self.equity_curve: List[Dict] = []
+        self.signal_log: List[Dict] = []  # Track all signals for confusion matrix
 
     def run(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         df = pd.read_csv(self.data_path)
         df["date"] = pd.to_datetime(df["date"])
         
         # Competition constraint: Trade only within Nov 1 - Dec 31, 2025
-        # Earlier data is used for indicator warmup only
         trade_start = df[df["date"] >= "2025-11-01"].index[0]
-        warmup = max(20, trade_start)  # Use pre-Nov data for feature warmup
+        warmup = max(50, trade_start)  # Increased for new indicators
 
         current_capital = self.capital
         self.equity_curve.append({"date": "Start", "equity": current_capital})
@@ -56,21 +78,102 @@ class Backtester:
 
             try:
                 signal = self.strategy.generate_signal(df_slice)
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Signal generation error: {e}")
                 signal = None
 
             if signal:
-                pnl = self._execute(
-                    signal, next_bar["open"], next_bar["high"],
-                    next_bar["low"], next_bar["close"], str(current_date.date())
+                pnl, trade = self._execute_with_trailing(
+                    signal, df, i, str(current_date.date())
                 )
                 current_capital += pnl
+                if trade:
+                    self.trades.append(trade)
 
             self.equity_curve.append({"date": str(current_date.date()), "equity": current_capital})
 
-        return pd.DataFrame(self.trades), pd.DataFrame(self.equity_curve)
+        trades_df = pd.DataFrame([vars(t) for t in self.trades]) if self.trades else pd.DataFrame()
+        return trades_df, pd.DataFrame(self.equity_curve)
+
+    def _execute_with_trailing(
+        self, 
+        signal: Dict, 
+        df: pd.DataFrame, 
+        bar_idx: int, 
+        date: str
+    ) -> Tuple[float, Optional[TradeRecord]]:
+        """Execute trade with optional trailing stop."""
+        next_bar = df.iloc[bar_idx + 1]
+        entry = next_bar["open"]
+        qty = signal["quantity"]
+        sl, tp = signal["stop_loss"], signal["take_profit"]
+        trailing_stop = signal.get("trailing_stop")
+        
+        # Track execution over multiple bars if trailing stop is used
+        exit_price, reason = next_bar["close"], "EOD"
+        high, low = next_bar["high"], next_bar["low"]
+        holding_bars = 1
+        max_favorable, max_adverse = 0.0, 0.0
+        
+        is_long = signal["signal"] == "BUY"
+        
+        if is_long:
+            max_favorable = max(0, high - entry)
+            max_adverse = max(0, entry - low)
+            
+            if low <= sl:
+                exit_price, reason = sl, "SL"
+            elif high >= tp:
+                exit_price, reason = tp, "TP"
+            elif self.config.use_trailing_stop and trailing_stop:
+                # Update trailing stop if price moved favorably
+                if high > entry + (entry - trailing_stop):
+                    trailing_stop = high - (entry - sl)  # Trail by original stop distance
+                if low <= trailing_stop:
+                    exit_price, reason = trailing_stop, "TSL"
+            
+            pnl = (exit_price - entry) * qty
+        else:
+            max_favorable = max(0, entry - low)
+            max_adverse = max(0, high - entry)
+            
+            if high >= sl:
+                exit_price, reason = sl, "SL"
+            elif low <= tp:
+                exit_price, reason = tp, "TP"
+            elif self.config.use_trailing_stop and trailing_stop:
+                if low < entry - (trailing_stop - entry):
+                    trailing_stop = low + (sl - entry)
+                if high >= trailing_stop:
+                    exit_price, reason = trailing_stop, "TSL"
+            
+            pnl = (entry - exit_price) * qty
+        
+        cost = entry * qty * (self.config.commission + self.config.slippage) * 2
+        pnl -= cost
+        
+        trade = TradeRecord(
+            date=date,
+            signal_type=signal["signal"],
+            entry=entry,
+            exit=exit_price,
+            qty=qty,
+            pnl=round(pnl, 2),
+            reason=reason,
+            confidence=signal["confidence"],
+            edge=signal["edge"],
+            regime=signal["regime"],
+            adx=signal.get("adx", 0),
+            risk_pct=signal.get("risk_pct", 0.02),
+            holding_bars=holding_bars,
+            max_favorable=round(max_favorable, 2),
+            max_adverse=round(max_adverse, 2)
+        )
+        
+        return pnl, trade
 
     def _execute(self, signal: Dict, entry: float, high: float, low: float, close: float, date: str) -> float:
+        """Legacy execution method for compatibility."""
         qty = signal["quantity"]
         sl, tp = signal["stop_loss"], signal["take_profit"]
         exit_price, reason = close, "EOD"
@@ -91,20 +194,16 @@ class Backtester:
         cost = entry * qty * (self.config.commission + self.config.slippage) * 2
         pnl -= cost
 
-        self.trades.append({
-            "date": date, "type": signal["signal"], "entry": entry, "exit": exit_price,
-            "qty": qty, "pnl": round(pnl, 2), "reason": reason,
-            "confidence": signal["confidence"], "edge": signal["edge"], "regime": signal["regime"]
-        })
-
         return pnl
 
     def calculate_metrics(self, trades_df: pd.DataFrame, equity_df: pd.DataFrame) -> Dict[str, str]:
+        """Calculate comprehensive backtest metrics."""
         if trades_df.empty:
             return {"Status": "No trades"}
 
         total = len(trades_df)
         wins = (trades_df["pnl"] > 0).sum()
+        losses = total - wins
         win_rate = wins / total
 
         equity_df["returns"] = equity_df["equity"].pct_change()
@@ -120,6 +219,31 @@ class Backtester:
         max_dd = abs(drawdown.min())
         calmar = ann_return / max_dd if max_dd > 0 else 0
 
+        # Enhanced metrics
+        gross_profit = trades_df[trades_df["pnl"] > 0]["pnl"].sum()
+        gross_loss = abs(trades_df[trades_df["pnl"] < 0]["pnl"].sum())
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+        
+        avg_win = trades_df[trades_df["pnl"] > 0]["pnl"].mean() if wins > 0 else 0
+        avg_loss = abs(trades_df[trades_df["pnl"] < 0]["pnl"].mean()) if losses > 0 else 0
+        win_loss_ratio = avg_win / avg_loss if avg_loss > 0 else float('inf')
+        
+        # Expectancy
+        expectancy = (win_rate * avg_win) - ((1 - win_rate) * avg_loss)
+        
+        # Kelly Criterion
+        if avg_loss > 0:
+            kelly = (win_rate * win_loss_ratio - (1 - win_rate)) / win_loss_ratio
+            kelly = max(0, min(0.25, kelly / 2))  # Half-Kelly, capped at 25%
+        else:
+            kelly = 0.25
+        
+        # Holding period stats
+        if "holding_bars" in trades_df.columns:
+            avg_hold = trades_df["holding_bars"].mean()
+        else:
+            avg_hold = 1.0
+
         return {
             "Total Trades": str(total),
             "Win Rate": f"{win_rate * 100:.2f}%",
@@ -128,48 +252,92 @@ class Backtester:
             "Sharpe Ratio": f"{sharpe:.2f}",
             "Max Drawdown": f"{max_dd * 100:.2f}%",
             "Calmar Ratio": f"{calmar:.2f}",
+            "Profit Factor": f"{profit_factor:.2f}",
+            "Avg Win": f"INR {avg_win:,.2f}",
+            "Avg Loss": f"INR {avg_loss:,.2f}",
+            "Win/Loss Ratio": f"{win_loss_ratio:.2f}",
+            "Expectancy": f"INR {expectancy:,.2f}",
+            "Kelly Fraction": f"{kelly * 100:.1f}%",
+            "Avg Holding": f"{avg_hold:.1f} bars",
             "Final Equity": f"INR {equity_df['equity'].iloc[-1]:,.2f}"
         }
+    
+    def sensitivity_analysis(
+        self, 
+        param_ranges: Optional[Dict] = None
+    ) -> pd.DataFrame:
+        """
+        Run sensitivity analysis on key parameters.
+        Tests strategy robustness across parameter ranges.
+        """
+        if param_ranges is None:
+            param_ranges = {
+                "pullback_pct": [0.12, 0.15, 0.18, 0.20],
+                "stop_atr": [1.2, 1.5, 1.8, 2.0],
+                "target_atr": [2.5, 3.0, 3.5, 4.0]
+            }
+        
+        results = []
+        
+        # Test pullback depth variations
+        for pb in param_ranges.get("pullback_pct", [0.15]):
+            self.strategy.trend.cfg.pullback_pct = pb
+            trades_df, equity_df = self.run()
+            metrics = self.calculate_metrics(trades_df, equity_df)
+            results.append({
+                "param": "pullback_pct",
+                "value": pb,
+                "trades": int(metrics.get("Total Trades", 0)),
+                "win_rate": metrics.get("Win Rate", "0%"),
+                "return": metrics.get("Total Return", "0%"),
+                "sharpe": metrics.get("Sharpe Ratio", "0")
+            })
+        
+        return pd.DataFrame(results)
 
 
 def _export_trade_log(trades_df: pd.DataFrame) -> None:
-    """
-    Export trades to a standardized format for transparency.
-    
-    Output columns:
-        entry_date, exit_date, side, entry_price, exit_price,
-        pnl, holding_days, reason_exit
-    """
+    """Export trades to a standardized format for transparency."""
     if trades_df.empty:
         return
-        
+    
+    # Map column names if needed
+    pnl_col = "pnl" if "pnl" in trades_df.columns else "pnl"
+    type_col = "signal_type" if "signal_type" in trades_df.columns else "type"
+    entry_col = "entry" if "entry" in trades_df.columns else "entry"
+    exit_col = "exit" if "exit" in trades_df.columns else "exit"
+    
     trade_log = pd.DataFrame({
         "entry_date": trades_df["date"],
         "exit_date": trades_df["date"],
-        "side": trades_df["type"].map({"BUY": "LONG", "SELL": "SHORT"}),
-        "entry_price": trades_df["entry"].round(2),
-        "exit_price": trades_df["exit"].round(2),
-        "pnl": trades_df["pnl"].round(2),
-        "holding_days": 1,
-        "reason_exit": trades_df["reason"]
+        "side": trades_df[type_col].map({"BUY": "LONG", "SELL": "SHORT"}),
+        "entry_price": trades_df[entry_col].round(2),
+        "exit_price": trades_df[exit_col].round(2),
+        "pnl": trades_df[pnl_col].round(2),
+        "holding_days": trades_df.get("holding_bars", 1),
+        "reason_exit": trades_df["reason"],
+        "confidence": trades_df.get("confidence", 0.5).round(3),
+        "regime": trades_df.get("regime", "UNKNOWN")
     })
     
+    os.makedirs("reports", exist_ok=True)
     trade_log.to_csv("reports/trades.csv", index=False)
 
 
 def main():
     os.makedirs("data/processed", exist_ok=True)
     os.makedirs("reports", exist_ok=True)
+    
     bt = Backtester("data/raw/NSE_SONATSOFTW-EQ.csv")
     trades, equity = bt.run()
     metrics = bt.calculate_metrics(trades, equity)
 
-    print("\n" + "=" * 50)
+    print("\n" + "=" * 60)
     print("BACKTEST RESULTS")
-    print("=" * 50)
+    print("=" * 60)
     for k, v in metrics.items():
         print(f"  {k:20s}: {v}")
-    print("=" * 50)
+    print("=" * 60)
 
     trades.to_csv("data/processed/trades.csv", index=False)
     equity.to_csv("data/processed/equity.csv", index=False)

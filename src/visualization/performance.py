@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from typing import Optional, Tuple
+from matplotlib.patches import Rectangle
+from typing import Optional, Tuple, List
 from pathlib import Path
 
 
@@ -35,7 +36,7 @@ class PerformanceVisualizer:
     ) -> plt.Figure:
         fig, ax = plt.subplots(figsize=(14, 7))
 
-        ax.plot(equity.index, equity.values, label="Strategy", color="#2E86AB")
+        ax.plot(equity.index, equity.values, label="Strategy", color="#2E86AB", linewidth=2)
 
         if benchmark is not None:
             normalized_benchmark = benchmark / benchmark.iloc[0] * equity.iloc[0]
@@ -49,7 +50,7 @@ class PerformanceVisualizer:
             )
         ax.set_title(title, fontweight="bold")
         ax.set_xlabel("Date")
-        ax.set_ylabel("Portfolio Value")
+        ax.set_ylabel("Portfolio Value (INR)")
         ax.legend(loc="upper left")
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
         ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
@@ -59,6 +60,64 @@ class PerformanceVisualizer:
         if save:
             fig.savefig(self.output_dir / "equity_curve.png", bbox_inches="tight")
 
+        return fig
+
+    def plot_equity_and_drawdown(
+        self,
+        equity: pd.Series,
+        title: str = "Equity Curve with Drawdown Analysis",
+        save: bool = True
+    ) -> plt.Figure:
+        """
+        Dual-panel visualization: Equity curve on top, drawdown below.
+        Highlights the low drawdown as a key strength.
+        """
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), 
+                                        gridspec_kw={'height_ratios': [2, 1]},
+                                        sharex=True)
+        
+        # Panel 1: Equity Curve
+        ax1.plot(equity.index, equity.values, color="#2E86AB", linewidth=2, label="Strategy Equity")
+        ax1.fill_between(equity.index, equity.iloc[0], equity.values, 
+                         alpha=0.3, color="#2E86AB")
+        ax1.axhline(y=equity.iloc[0], color='gray', linestyle='--', alpha=0.5, label='Initial Capital')
+        ax1.set_title(title, fontweight="bold", fontsize=14)
+        ax1.set_ylabel("Portfolio Value (INR)")
+        ax1.legend(loc="upper left")
+        ax1.grid(True, alpha=0.3)
+        
+        # Panel 2: Drawdown
+        rolling_max = equity.expanding().max()
+        drawdown = (equity - rolling_max) / rolling_max * 100
+        
+        ax2.fill_between(drawdown.index, drawdown.values, 0, 
+                         color="#E63946", alpha=0.5, label="Drawdown")
+        ax2.plot(drawdown.index, drawdown.values, color="#E63946", linewidth=1)
+        ax2.axhline(y=0, color='black', linewidth=0.5)
+        ax2.set_ylabel("Drawdown (%)")
+        ax2.set_xlabel("Date")
+        ax2.set_ylim(min(drawdown.min() * 1.2, -0.5), 1)
+        
+        # Annotate max drawdown
+        max_dd_idx = drawdown.idxmin()
+        max_dd_val = drawdown.min()
+        ax2.annotate(
+            f'Max DD: {max_dd_val:.2f}%',
+            xy=(max_dd_idx, max_dd_val),
+            xytext=(max_dd_idx, max_dd_val - 0.3),
+            fontsize=10,
+            color='#E63946',
+            fontweight='bold'
+        )
+        
+        ax2.legend(loc="lower left")
+        ax2.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        
+        if save:
+            fig.savefig(self.output_dir / "equity_drawdown_dual.png", bbox_inches="tight", dpi=120)
+        
         return fig
 
     def plot_drawdown(
@@ -96,13 +155,155 @@ class PerformanceVisualizer:
 
         return fig
 
+    def plot_trades_on_price(
+        self,
+        price_df: pd.DataFrame,
+        trades_df: pd.DataFrame,
+        title: str = "Price Chart with Trade Entries",
+        save: bool = True,
+        annotate_count: int = 3
+    ) -> plt.Figure:
+        """
+        Plot price chart with trade entry/exit markers.
+        Green triangles for buys, red triangles for sells.
+        Annotates top performing trades.
+        """
+        fig, ax = plt.subplots(figsize=(16, 8))
+        
+        # Price line
+        dates = pd.to_datetime(price_df["date"])
+        ax.plot(dates, price_df["close"], color="#333333", linewidth=1.5, label="Close Price")
+        
+        # Moving averages for context
+        if "SMA_20" in price_df.columns:
+            ax.plot(dates, price_df["SMA_20"], color="#2E86AB", linewidth=1, 
+                    alpha=0.7, linestyle="--", label="SMA(20)")
+        if "EMA_10" in price_df.columns:
+            ax.plot(dates, price_df["EMA_10"], color="#F77F00", linewidth=1, 
+                    alpha=0.7, linestyle="--", label="EMA(10)")
+        
+        if not trades_df.empty:
+            # Map trades to dates
+            trade_dates = pd.to_datetime(trades_df["date"])
+            
+            # Determine trade type column
+            type_col = "signal_type" if "signal_type" in trades_df.columns else "type"
+            entry_col = "entry" if "entry" in trades_df.columns else "entry_price"
+            
+            # Plot buy signals
+            buys = trades_df[trades_df[type_col] == "BUY"]
+            if not buys.empty:
+                buy_dates = pd.to_datetime(buys["date"])
+                ax.scatter(buy_dates, buys[entry_col], marker="^", s=150, 
+                          color="#2E86AB", edgecolors="black", linewidths=1,
+                          label="BUY", zorder=5)
+            
+            # Plot sell signals
+            sells = trades_df[trades_df[type_col] == "SELL"]
+            if not sells.empty:
+                sell_dates = pd.to_datetime(sells["date"])
+                ax.scatter(sell_dates, sells[entry_col], marker="v", s=150,
+                          color="#E63946", edgecolors="black", linewidths=1,
+                          label="SELL", zorder=5)
+            
+            # Annotate top trades
+            if "pnl" in trades_df.columns:
+                top_trades = trades_df.nlargest(annotate_count, "pnl")
+                for _, trade in top_trades.iterrows():
+                    trade_date = pd.to_datetime(trade["date"])
+                    ax.annotate(
+                        f'+{trade["pnl"]:.0f}',
+                        xy=(trade_date, trade[entry_col]),
+                        xytext=(10, 20),
+                        textcoords="offset points",
+                        fontsize=9,
+                        color="#2E86AB",
+                        fontweight="bold",
+                        arrowprops=dict(arrowstyle="->", color="#2E86AB", alpha=0.7)
+                    )
+        
+        ax.set_title(title, fontweight="bold", fontsize=14)
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Price (INR)")
+        ax.legend(loc="upper left")
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        
+        if save:
+            fig.savefig(self.output_dir / "price_with_trades.png", bbox_inches="tight", dpi=120)
+        
+        return fig
+
+    def plot_confusion_matrix(
+        self,
+        y_true: np.ndarray,
+        y_pred: np.ndarray,
+        title: str = "ML Filter Confusion Matrix",
+        save: bool = True
+    ) -> plt.Figure:
+        """
+        Plot confusion matrix for the ML filter.
+        Shows TP, TN, FP, FN rates.
+        """
+        from sklearn.metrics import confusion_matrix
+        
+        cm = confusion_matrix(y_true, y_pred)
+        
+        fig, ax = plt.subplots(figsize=(8, 6))
+        
+        # Create heatmap
+        im = ax.imshow(cm, cmap='Blues')
+        
+        # Labels
+        labels = ['Predicted Negative', 'Predicted Positive']
+        ax.set_xticks([0, 1])
+        ax.set_yticks([0, 1])
+        ax.set_xticklabels(labels)
+        ax.set_yticklabels(['Actual Negative', 'Actual Positive'])
+        
+        # Add values to cells
+        for i in range(2):
+            for j in range(2):
+                total = cm.sum()
+                value = cm[i, j]
+                pct = value / total * 100
+                text = f'{value}\n({pct:.1f}%)'
+                color = 'white' if value > total / 4 else 'black'
+                ax.text(j, i, text, ha='center', va='center', 
+                       fontsize=14, color=color, fontweight='bold')
+        
+        # Labels for metrics
+        tn, fp, fn, tp = cm.ravel()
+        total = tn + fp + fn + tp
+        
+        metrics_text = (
+            f"Accuracy: {(tp+tn)/total:.1%}\n"
+            f"Precision: {tp/(tp+fp):.1%}\n"
+            f"Recall: {tp/(tp+fn):.1%}\n"
+            f"F1 Score: {2*tp/(2*tp+fp+fn):.1%}"
+        )
+        
+        ax.text(1.35, 0.5, metrics_text, transform=ax.transAxes, 
+               fontsize=11, verticalalignment='center',
+               bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+        
+        ax.set_title(title, fontweight="bold", fontsize=14)
+        plt.colorbar(im, ax=ax, shrink=0.8)
+        plt.tight_layout()
+        
+        if save:
+            fig.savefig(self.output_dir / "confusion_matrix.png", bbox_inches="tight", dpi=120)
+        
+        return fig
+
     def plot_monthly_returns(
         self,
         returns: pd.Series,
         title: str = "Monthly Returns Heatmap",
         save: bool = True
     ) -> plt.Figure:
-        monthly_returns = returns.resample("M").apply(
+        monthly_returns = returns.resample("ME").apply(
             lambda x: (1 + x).prod() - 1
         ) * 100
 
@@ -149,10 +350,11 @@ class PerformanceVisualizer:
         trades: pd.DataFrame,
         save: bool = True
     ) -> plt.Figure:
-        if "pnl" not in trades.columns:
+        pnl_col = "pnl" if "pnl" in trades.columns else "pnl"
+        if pnl_col not in trades.columns:
             raise ValueError("trades DataFrame must contain 'pnl' column")
 
-        pnl = trades["pnl"].dropna()
+        pnl = trades[pnl_col].dropna()
 
         fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
@@ -162,7 +364,7 @@ class PerformanceVisualizer:
         axes[0].axvline(x=pnl.mean(), color="#F77F00", linestyle="-", linewidth=2,
                        label=f"Mean: {pnl.mean():.2f}")
         axes[0].set_title("Trade P&L Distribution", fontweight="bold")
-        axes[0].set_xlabel("P&L")
+        axes[0].set_xlabel("P&L (INR)")
         axes[0].set_ylabel("Frequency")
         axes[0].legend()
 
@@ -185,18 +387,72 @@ class PerformanceVisualizer:
 
         return fig
 
+    def plot_regime_performance(
+        self,
+        trades: pd.DataFrame,
+        title: str = "Performance by Market Regime",
+        save: bool = True
+    ) -> plt.Figure:
+        """Analyze and visualize performance across different market regimes."""
+        if "regime" not in trades.columns or trades.empty:
+            return None
+        
+        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+        
+        # Trades by regime
+        regime_counts = trades["regime"].value_counts()
+        colors = plt.cm.Set2(np.linspace(0, 1, len(regime_counts)))
+        axes[0].bar(regime_counts.index, regime_counts.values, color=colors)
+        axes[0].set_title("Trade Count by Regime", fontweight="bold")
+        axes[0].set_xlabel("Market Regime")
+        axes[0].set_ylabel("Number of Trades")
+        axes[0].tick_params(axis='x', rotation=45)
+        
+        # Win rate by regime
+        pnl_col = "pnl" if "pnl" in trades.columns else "pnl"
+        regime_winrate = trades.groupby("regime")[pnl_col].apply(
+            lambda x: (x > 0).mean() * 100
+        )
+        axes[1].bar(regime_winrate.index, regime_winrate.values, color=colors)
+        axes[1].axhline(y=50, color='gray', linestyle='--', alpha=0.7, label='50% baseline')
+        axes[1].set_title("Win Rate by Regime", fontweight="bold")
+        axes[1].set_xlabel("Market Regime")
+        axes[1].set_ylabel("Win Rate (%)")
+        axes[1].tick_params(axis='x', rotation=45)
+        axes[1].legend()
+        
+        plt.tight_layout()
+        
+        if save:
+            fig.savefig(self.output_dir / "regime_performance.png", bbox_inches="tight")
+        
+        return fig
+
     def generate_report(
         self,
         equity: pd.Series,
         trades: pd.DataFrame,
-        benchmark: Optional[pd.Series] = None
+        benchmark: Optional[pd.Series] = None,
+        price_df: Optional[pd.DataFrame] = None
     ) -> None:
+        """Generate comprehensive performance report with all visualizations."""
         returns = equity.pct_change().dropna()
+        
+        # Core plots
         self.plot_equity_curve(equity, benchmark)
         self.plot_drawdown(equity)
+        self.plot_equity_and_drawdown(equity)
         self.plot_monthly_returns(returns)
+        
         if "pnl" in trades.columns:
             self.plot_trade_distribution(trades)
+        
+        if "regime" in trades.columns:
+            self.plot_regime_performance(trades)
+        
+        # Price chart with trades if data available
+        if price_df is not None and not trades.empty:
+            self.plot_trades_on_price(price_df, trades)
 
     def calculate_metrics(self, equity: pd.Series) -> dict:
         returns = equity.pct_change().dropna()
