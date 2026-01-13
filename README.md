@@ -6,6 +6,19 @@ A rule-based trend-following trading system for NSE equities, using pullback ent
 
 ---
 
+## Forward Forecast (Jan 1-8, 2026)
+
+| Attribute | Value |
+|-----------|-------|
+| Bias | BULLISH |
+| Confidence | MODERATE (68%) |
+| Regime | Strong Up |
+| Key Factors | Price above 20-day mean, Positive short-term momentum |
+
+*Note: This is a probabilistic directional bias, not a price target. The model updates daily based on the latest market data.*
+
+---
+
 ## Backtest Results
 
 ```
@@ -101,6 +114,9 @@ finstreet/
 │   │   ├── advanced_features.py
 │   │   ├── labeling.py     → Triple-barrier labeling
 │   │   └── preprocessing.py
+│   │
+│   ├── forecast/
+│   │   └── generate_forecast.py → Probabilistic signal output
 │   │
 │   ├── model/              → Machine learning components
 │   │   ├── train.py        → XGBoost training
