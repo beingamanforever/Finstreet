@@ -86,6 +86,7 @@ python run.py all
 ```
 finstreet/
 ├── run.py                  → Entry point (runs the full pipeline)
+├── audit_bias.py           → Verifies absence of look-ahead bias
 │
 ├── config/
 │   └── settings.py         → Strategy and model configuration
@@ -124,3 +125,18 @@ finstreet/
 └── reports/
     └── figures/            → Performance charts
 ```
+
+---
+
+## Bias Audit
+
+To verify the system does not use future data in feature computation:
+
+```bash
+python audit_bias.py
+```
+
+This script validates:
+- No feature for day T contains day T+1 price data
+- Rolling window calculations use only historical data
+- No suspicious correlations between features and future prices
