@@ -34,14 +34,6 @@ ML-based trading system for NSE equities using FYERS API.
   <img src="reports/figures/drawdown.png" width="500" alt="Drawdown">
 </p>
 
-<p align="center">
-  <img src="reports/figures/monthly_returns.png" width="500" alt="Monthly Returns">
-</p>
-
-<p align="center">
-  <img src="reports/figures/trade_distribution.png" width="500" alt="Trade Distribution">
-</p>
-
 ---
 
 ## Quick Start
