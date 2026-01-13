@@ -28,7 +28,16 @@ def train_model() -> Tuple[Optional[XGBClassifier], Optional[List[str]]]:
         return None, None
 
     df = pd.read_csv(DATA_PATH)
+    
+    # Competition constraint: Use only Nov 1 - Dec 31, 2025 for training
+    # Earlier data is used only for indicator warmup (required for technical features)
+    df["date"] = pd.to_datetime(df["date"])
+    train_mask = (df["date"] >= "2025-11-01") & (df["date"] <= "2025-12-31")
+    
+    # Compute features on full data (indicators need history), then filter
     df_processed = preprocess_pipeline(df, is_training=True, min_hold=2, max_hold=5)
+    df_processed["date"] = pd.to_datetime(df_processed["date"])
+    df_processed = df_processed[(df_processed["date"] >= "2025-11-01") & (df_processed["date"] <= "2025-12-31")]
 
     if df_processed.empty:
         logger.error("No samples after preprocessing")

@@ -10,10 +10,10 @@ A rule-based trend-following trading system for NSE equities, using pullback ent
 
 | Attribute | Value |
 |-----------|-------|
-| Bias | BULLISH |
-| Confidence | MODERATE (68%) |
+| Bias | BEARISH |
+| Confidence | MODERATE (69%) |
 | Regime | Strong Up |
-| Key Factors | Price above 20-day mean, Positive short-term momentum |
+| Key Factors | Neutral technical conditions |
 
 *Note: This is a probabilistic directional bias, not a price target. The model updates daily based on the latest market data.*
 
@@ -25,17 +25,32 @@ A rule-based trend-following trading system for NSE equities, using pullback ent
 ┌─────────────────────┬─────────────┐
 │ Metric              │ Value       │
 ├─────────────────────┼─────────────┤
-│ Total Trades        │ 28          │
-│ Win Rate            │ 64.29%      │
-│ Total Return        │ 2.03%       │
-│ Sharpe Ratio        │ 2.24        │
-│ Max Drawdown        │ 0.66%       │
-│ Calmar Ratio        │ 6.23        │
-│ Final Equity        │ ₹102,028    │
+│ Total Trades        │ 11          │
+│ Win Rate            │ 72.73%      │
+│ Total Return        │ 0.88%       │
+│ Sharpe Ratio        │ 2.49        │
+│ Max Drawdown        │ 0.48%       │
+│ Calmar Ratio        │ 11.42       │
+│ Final Equity        │ ₹100,880    │
 └─────────────────────┴─────────────┘
 ```
 
-**Period:** Jul 9 - Dec 31, 2025 (after 125-day warmup) | **Symbol:** NSE:SONATSOFTW-EQ
+**Period:** Nov 1 - Dec 31, 2025 | **Symbol:** NSE:SONATSOFTW-EQ
+
+---
+
+## Data Methodology
+
+| Aspect | Implementation | Competition Compliance |
+|--------|----------------|------------------------|
+| **Training Period** | Nov 1 - Dec 31, 2025 | Per competition rules (2 months) |
+| **Indicator Warmup** | Jan 1 - Oct 31, 2025 | Required for RSI, MACD, etc. |
+| **Trading Period** | Nov 1 - Dec 31, 2025 | All 11 trades within allowed window |
+| **Data Source** | FYERS API (daily OHLCV) | Mandatory per rules |
+| **Feature Leakage** | None detected | Verified via `audit_bias.py` |
+| **Label Construction** | T+2 to T+5 forward returns | Predicting future (valid) |
+
+**Note:** Historical data before Nov 1 is used **only** for computing technical indicators (e.g., 20-day SMA requires 20 prior days). No training or trading decisions use pre-November data directly.
 
 ---
 

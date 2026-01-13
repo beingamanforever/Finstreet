@@ -33,7 +33,12 @@ class Backtester:
 
     def run(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         df = pd.read_csv(self.data_path)
-        warmup = max(30, int(len(df) * 0.5))
+        df["date"] = pd.to_datetime(df["date"])
+        
+        # Competition constraint: Trade only within Nov 1 - Dec 31, 2025
+        # Earlier data is used for indicator warmup only
+        trade_start = df[df["date"] >= "2025-11-01"].index[0]
+        warmup = max(20, trade_start)  # Use pre-Nov data for feature warmup
 
         current_capital = self.capital
         self.equity_curve.append({"date": "Start", "equity": current_capital})
@@ -41,6 +46,12 @@ class Backtester:
         for i in range(warmup, len(df) - 1):
             df_slice = df.iloc[:i + 1].copy()
             current_date = df_slice.iloc[-1]["date"]
+            
+            # Only generate signals for Nov-Dec 2025 period
+            if current_date < pd.Timestamp("2025-11-01") or current_date > pd.Timestamp("2025-12-31"):
+                self.equity_curve.append({"date": str(current_date.date()), "equity": current_capital})
+                continue
+                
             next_bar = df.iloc[i + 1]
 
             try:
@@ -51,11 +62,11 @@ class Backtester:
             if signal:
                 pnl = self._execute(
                     signal, next_bar["open"], next_bar["high"],
-                    next_bar["low"], next_bar["close"], current_date
+                    next_bar["low"], next_bar["close"], str(current_date.date())
                 )
                 current_capital += pnl
 
-            self.equity_curve.append({"date": current_date, "equity": current_capital})
+            self.equity_curve.append({"date": str(current_date.date()), "equity": current_capital})
 
         return pd.DataFrame(self.trades), pd.DataFrame(self.equity_curve)
 
