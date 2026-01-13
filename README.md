@@ -50,9 +50,10 @@ A rule-based trend-following trading system for NSE equities, using pullback ent
 | **Feature Leakage** | None detected | Verified via `audit_bias.py` |
 | **Label Construction** | T+2 to T+5 forward returns | Predicting future (valid) |
 
-**Note:** Historical data before Nov 1 is used **only** for computing technical indicators (e.g., 20-day SMA requires 20 prior days). No training or trading decisions use pre-November data directly.
 
----
+**Note:** Historical data before Nov 1 is used **only** to compute technical indicators (e.g., 20-day SMA requires 20 prior days).
+All model training, signal generation, and trading decisions are restricted to Nov–Dec.
+
 
 ## Performance Charts
 
