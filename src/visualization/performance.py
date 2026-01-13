@@ -1,8 +1,3 @@
-"""
-Performance visualization module for backtest analysis.
-Generates equity curves, drawdown charts, and trade distribution plots.
-"""
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,7 +7,6 @@ from pathlib import Path
 
 
 class PerformanceVisualizer:
-    """Visualizer for backtest performance metrics and trade analysis."""
 
     def __init__(self, output_dir: str = "reports/figures"):
         self.output_dir = Path(output_dir)
@@ -20,7 +14,6 @@ class PerformanceVisualizer:
         self._setup_style()
 
     def _setup_style(self) -> None:
-        """Configure matplotlib style for consistent visualization."""
         plt.style.use("seaborn-v0_8-whitegrid")
         plt.rcParams.update({
             "figure.figsize": (12, 6),
@@ -40,18 +33,6 @@ class PerformanceVisualizer:
         title: str = "Portfolio Equity Curve",
         save: bool = True
     ) -> plt.Figure:
-        """
-        Plot portfolio equity curve with optional benchmark comparison.
-
-        Args:
-            equity: Portfolio equity series with datetime index
-            benchmark: Optional benchmark series for comparison
-            title: Plot title
-            save: Whether to save the figure
-
-        Returns:
-            matplotlib Figure object
-        """
         fig, ax = plt.subplots(figsize=(14, 7))
 
         ax.plot(equity.index, equity.values, label="Strategy", color="#2E86AB")
@@ -66,7 +47,6 @@ class PerformanceVisualizer:
                 linestyle="--",
                 alpha=0.7
             )
-
         ax.set_title(title, fontweight="bold")
         ax.set_xlabel("Date")
         ax.set_ylabel("Portfolio Value")
@@ -87,17 +67,6 @@ class PerformanceVisualizer:
         title: str = "Portfolio Drawdown",
         save: bool = True
     ) -> plt.Figure:
-        """
-        Plot drawdown chart showing underwater periods.
-
-        Args:
-            equity: Portfolio equity series with datetime index
-            title: Plot title
-            save: Whether to save the figure
-
-        Returns:
-            matplotlib Figure object
-        """
         rolling_max = equity.expanding().max()
         drawdown = (equity - rolling_max) / rolling_max * 100
 
@@ -133,17 +102,6 @@ class PerformanceVisualizer:
         title: str = "Monthly Returns Heatmap",
         save: bool = True
     ) -> plt.Figure:
-        """
-        Plot monthly returns heatmap.
-
-        Args:
-            returns: Daily returns series with datetime index
-            title: Plot title
-            save: Whether to save the figure
-
-        Returns:
-            matplotlib Figure object
-        """
         monthly_returns = returns.resample("M").apply(
             lambda x: (1 + x).prod() - 1
         ) * 100
@@ -191,16 +149,6 @@ class PerformanceVisualizer:
         trades: pd.DataFrame,
         save: bool = True
     ) -> plt.Figure:
-        """
-        Plot trade P&L distribution histogram.
-
-        Args:
-            trades: DataFrame with 'pnl' column
-            save: Whether to save the figure
-
-        Returns:
-            matplotlib Figure object
-        """
         if "pnl" not in trades.columns:
             raise ValueError("trades DataFrame must contain 'pnl' column")
 
@@ -243,44 +191,22 @@ class PerformanceVisualizer:
         trades: pd.DataFrame,
         benchmark: Optional[pd.Series] = None
     ) -> None:
-        """
-        Generate complete performance report with all visualizations.
-
-        Args:
-            equity: Portfolio equity series
-            trades: DataFrame with trade details
-            benchmark: Optional benchmark series
-        """
         returns = equity.pct_change().dropna()
-
         self.plot_equity_curve(equity, benchmark)
         self.plot_drawdown(equity)
         self.plot_monthly_returns(returns)
-
         if "pnl" in trades.columns:
             self.plot_trade_distribution(trades)
 
     def calculate_metrics(self, equity: pd.Series) -> dict:
-        """
-        Calculate key performance metrics.
-
-        Args:
-            equity: Portfolio equity series
-
-        Returns:
-            Dictionary of performance metrics
-        """
         returns = equity.pct_change().dropna()
-
         total_return = (equity.iloc[-1] / equity.iloc[0] - 1) * 100
         annual_return = (1 + total_return / 100) ** (252 / len(returns)) - 1
         volatility = returns.std() * np.sqrt(252) * 100
         sharpe_ratio = (annual_return * 100) / volatility if volatility != 0 else 0
-
         rolling_max = equity.expanding().max()
         drawdown = (equity - rolling_max) / rolling_max
         max_drawdown = drawdown.min() * 100
-
         return {
             "total_return": round(total_return, 2),
             "annual_return": round(annual_return * 100, 2),
