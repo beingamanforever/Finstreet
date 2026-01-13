@@ -121,8 +121,34 @@ class Backtester:
         }
 
 
+def _export_trade_log(trades_df: pd.DataFrame) -> None:
+    """
+    Export trades to a standardized format for transparency.
+    
+    Output columns:
+        entry_date, exit_date, side, entry_price, exit_price,
+        pnl, holding_days, reason_exit
+    """
+    if trades_df.empty:
+        return
+        
+    trade_log = pd.DataFrame({
+        "entry_date": trades_df["date"],
+        "exit_date": trades_df["date"],
+        "side": trades_df["type"].map({"BUY": "LONG", "SELL": "SHORT"}),
+        "entry_price": trades_df["entry"].round(2),
+        "exit_price": trades_df["exit"].round(2),
+        "pnl": trades_df["pnl"].round(2),
+        "holding_days": 1,
+        "reason_exit": trades_df["reason"]
+    })
+    
+    trade_log.to_csv("reports/trades.csv", index=False)
+
+
 def main():
     os.makedirs("data/processed", exist_ok=True)
+    os.makedirs("reports", exist_ok=True)
     bt = Backtester("data/raw/NSE_SONATSOFTW-EQ.csv")
     trades, equity = bt.run()
     metrics = bt.calculate_metrics(trades, equity)
@@ -136,6 +162,8 @@ def main():
 
     trades.to_csv("data/processed/trades.csv", index=False)
     equity.to_csv("data/processed/equity.csv", index=False)
+    
+    _export_trade_log(trades)
 
 
 if __name__ == "__main__":

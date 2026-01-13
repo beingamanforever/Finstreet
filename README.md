@@ -123,8 +123,26 @@ finstreet/
 ├── models/                 → Trained model artifacts
 │
 └── reports/
+    ├── trades.csv          → Complete trade log
     └── figures/            → Performance charts
 ```
+
+---
+
+## Trade Log
+
+Full trade history is available at [`reports/trades.csv`](reports/trades.csv) with the following columns:
+
+| Column | Description |
+|--------|-------------|
+| `entry_date` | Trade entry date |
+| `exit_date` | Trade exit date |
+| `side` | LONG or SHORT |
+| `entry_price` | Entry execution price |
+| `exit_price` | Exit execution price |
+| `pnl` | Profit/Loss in INR |
+| `holding_days` | Duration of trade |
+| `reason_exit` | Exit trigger (TP / SL / EOD) |
 
 ---
 
