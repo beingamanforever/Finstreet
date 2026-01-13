@@ -1,0 +1,47 @@
+# Python
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Data
+data/raw/*.csv
+data/processed/*.csv
+
+# Models
+models/*.pkl
+models/*.csv
+
+# Logs
+*.log
+execution.log
+
+# LaTeX
+*.aux
+*.log
+*.out
+*.toc
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+
+# Jupyter
+.ipynb_checkpoints/
