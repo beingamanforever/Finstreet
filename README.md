@@ -1,6 +1,8 @@
 # Finstreet Trading System
 
-ML-based trading system for NSE equities using FYERS API.
+A rule-based trend-following trading system for NSE equities, using pullback entries and ATR-based risk management, with a lightweight ML layer to filter low-quality trades.
+
+**Data Source:** FYERS API
 
 ---
 
@@ -76,3 +78,49 @@ python run.py all
 - **Entry:** Wait for 18-20% pullback in trend direction
 - **Confirmation:** ML model validates signal alignment
 - **Risk:** ATR-based stops (2x) and targets (4x), 3% risk per trade
+
+---
+
+## Repository Structure
+
+```
+finstreet/
+├── run.py                  → Entry point (runs the full pipeline)
+│
+├── config/
+│   └── settings.py         → Strategy and model configuration
+│
+├── src/
+│   ├── data/               → Data ingestion layer
+│   │   ├── fetch_data.py   → Historical data via FYERS API
+│   │   └── fyers_client.py → API client wrapper
+│   │
+│   ├── features/           → Feature engineering
+│   │   ├── indicators.py   → RSI, MACD, Bollinger Bands, ATR
+│   │   ├── advanced_features.py
+│   │   ├── labeling.py     → Triple-barrier labeling
+│   │   └── preprocessing.py
+│   │
+│   ├── model/              → Machine learning components
+│   │   ├── train.py        → XGBoost training
+│   │   └── predictor.py   → Inference and confidence scores
+│   │
+│   ├── strategy/           → Trading logic
+│   │   ├── trend_momentum.py → Core trend + pullback logic
+│   │   └── strategy.py       → Signal generation with ML filter
+│   │
+│   ├── backtest/           → Backtesting and PnL calculation
+│   │   └── backtest.py
+│   │
+│   └── visualization/      → Result visualization
+│       └── performance.py  → Equity curve, drawdown, trade plots
+│
+├── data/
+│   ├── raw/                → Raw OHLCV data
+│   └── processed/          → Engineered features and equity series
+│
+├── models/                 → Trained model artifacts
+│
+└── reports/
+    └── figures/            → Performance charts
+```
