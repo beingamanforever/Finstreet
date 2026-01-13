@@ -35,7 +35,7 @@ A rule-based trend-following trading system for NSE equities, using pullback ent
 └─────────────────────┴─────────────┘
 ```
 
-**Period:** Nov 1 - Dec 31, 2025 | **Symbol:** NSE:SONATSOFTW-EQ
+**Period:** Jul 9 - Dec 31, 2025 (after 125-day warmup) | **Symbol:** NSE:SONATSOFTW-EQ
 
 ---
 
