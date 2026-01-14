@@ -1,31 +1,34 @@
 import os
+import sys
 import logging
 from datetime import datetime
 
 import pandas as pd
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.data.fyers_client import FyersClient
 from src.strategy.strategy import Strategy
+from config.settings import settings
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-SYMBOL = "NSE:SONATSOFTW-EQ"
-DATA_PATH = "data/raw/NSE_SONATSOFTW-EQ.csv"
 
 
 def execute():
     client = FyersClient()
     strategy = Strategy(capital=100000)
+    
+    symbol = settings.data.default_symbol
+    data_path = str(settings.data.data_path)
 
     end_date = datetime.now().strftime("%Y-%m-%d")
     start_date = (datetime.now() - pd.Timedelta(days=60)).strftime("%Y-%m-%d")
 
-    df = client.fetch_historical_data(SYMBOL, start_date, end_date)
+    df = client.fetch_historical_data(symbol, start_date, end_date)
 
     if df is None or df.empty:
-        if os.path.exists(DATA_PATH):
-            df = pd.read_csv(DATA_PATH)
+        if os.path.exists(data_path):
+            df = pd.read_csv(data_path)
         else:
             logger.error("No data available")
             return

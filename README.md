@@ -83,20 +83,28 @@ Prediction: Jan 1 - 8, 2026 (out-of-sample)
 ### Trade Distribution
 <img src="reports/figures/trade_distribution.png" width="600">
 
+### Model Performance
+
+<img src="reports/figures/confusion_matrix.png" width="450"> <img src="reports/figures/feature_importance.png" width="450">
+
+**Feature Importance Insight:** Volatility features dominate (ATR z-score: 39%, ATR percentile: 28%, returns_std: 20%). The model prioritizes *regime detection* over momentum signals identifying when volatility conditions favor trend continuation rather than predicting direction directly.
+
 ---
 
 ## Forward Predictions (Jan 1-8, 2026)
 
 | Date | Signal | Direction | Confidence | Regime |
 |:----:|:------:|:---------:|:----------:|:------:|
-| Jan 1 | HOLD | DOWN | 68% | Uptrend Strong |
-| Jan 2 | HOLD | DOWN | 68% | Uptrend Strong |
-| Jan 5 | HOLD | DOWN | 68% | Uptrend Strong |
-| Jan 6 | HOLD | DOWN | 68% | Uptrend Strong |
-| Jan 7 | HOLD | DOWN | 68% | Uptrend Strong |
-| Jan 8 | HOLD | DOWN | 68% | Uptrend Strong |
+| Jan 1 | HOLD | DOWN | 77.6% | Uptrend Strong |
+| Jan 2 | SELL | DOWN | 77.6% | Transitional |
+| Jan 5 | SELL | DOWN | 75.6% | Transitional |
+| Jan 6 | HOLD | DOWN | 54.6% | Transitional |
+| Jan 7 | HOLD | DOWN | 54.6% | Transitional |
+| Jan 8 | HOLD | UP | 53.7% | Downtrend Strong |
 
-Model predicts DOWN but regime is Uptrend Strong. Conservative approach holds rather than selling against the trend.
+<img src="reports/figures/predictions_chart.png" width="700">
+
+Model predicts directional bias with regime-aware signal generation. SELL signals in Transitional regimes align with momentum; HOLD signals in conflicting regimes (DOWN prediction in Uptrend) prioritize capital preservation.
 
 ---
 

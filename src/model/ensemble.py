@@ -34,11 +34,11 @@ except ImportError:
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.features.preprocessing import preprocess_pipeline, get_feature_columns
+from config.settings import settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-DATA_PATH = "data/raw/NSE_SONATSOFTW-EQ.csv"
 MODEL_PATH = "models/xgb_model.pkl"
 ENSEMBLE_PATH = "models/ensemble_model.pkl"
 FEATURES_PATH = "models/features.pkl"
@@ -175,15 +175,18 @@ class EnsembleTrainer:
         rec = recall_score(y_true, y_pred, zero_division=0)
         f1 = f1_score(y_true, y_pred, zero_division=0)
         
+        # Normalize probabilities to ensure they sum to 1
+        y_proba_normalized = self._normalize_probabilities(y_proba)
+        
         # Handle single-class case in log_loss
         unique_classes = np.unique(y_true)
         if len(unique_classes) < 2:
-            ll = 0.0  # No meaningful log_loss with single class
+            ll = 0.0
         else:
-            ll = log_loss(y_true, y_proba, labels=[0, 1])
+            ll = log_loss(y_true, y_proba_normalized, labels=[0, 1])
         
         cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
-        kelly = calculate_kelly_fraction(y_true, y_pred, y_proba)
+        kelly = calculate_kelly_fraction(y_true, y_pred, y_proba_normalized)
         
         return ModelMetrics(
             accuracy=acc,
@@ -194,6 +197,41 @@ class EnsembleTrainer:
             confusion=cm,
             kelly_fraction=kelly
         )
+    
+    def _normalize_probabilities(self, proba: np.ndarray) -> np.ndarray:
+        """
+        Normalize probability array to ensure rows sum to 1.
+        Handles edge cases from ensemble averaging.
+        """
+        if proba.ndim == 1:
+            proba = np.column_stack([1 - proba, proba])
+        
+        row_sums = proba.sum(axis=1, keepdims=True)
+        row_sums = np.where(row_sums == 0, 1, row_sums)
+        return proba / row_sums
+    
+    def _blend_probabilities(
+        self,
+        xgb_proba: np.ndarray,
+        lgbm_proba: np.ndarray
+    ) -> np.ndarray:
+        """
+        Blend XGBoost and LightGBM probabilities with proper normalization.
+        
+        Handles cases where models output different probability formats
+        and ensures final output sums to 1.
+        """
+        # Ensure both are 2D arrays with shape (n_samples, 2)
+        if xgb_proba.ndim == 1:
+            xgb_proba = np.column_stack([1 - xgb_proba, xgb_proba])
+        if lgbm_proba.ndim == 1:
+            lgbm_proba = np.column_stack([1 - lgbm_proba, lgbm_proba])
+        
+        # Weighted average
+        blended = self.xgb_weight * xgb_proba + self.lgbm_weight * lgbm_proba
+        
+        # Normalize to ensure probabilities sum to 1
+        return self._normalize_probabilities(blended)
     
     def train_static(self, df: pd.DataFrame) -> Tuple[Optional[XGBClassifier], Optional[List[str]]]:
         """
@@ -242,13 +280,10 @@ class EnsembleTrainer:
                 self.lgbm_model.fit(X_train, y_train, sample_weight=w_train)
                 lgbm_proba = self.lgbm_model.predict_proba(X_test)
                 
-                # Ensemble prediction
-                ensemble_proba = (
-                    self.xgb_weight * xgb_proba + 
-                    self.lgbm_weight * lgbm_proba
-                )
+                # Ensemble prediction with proper normalization
+                ensemble_proba = self._blend_probabilities(xgb_proba, lgbm_proba)
             else:
-                ensemble_proba = xgb_proba
+                ensemble_proba = self._normalize_probabilities(xgb_proba)
             
             y_pred = (ensemble_proba[:, 1] > 0.5).astype(int)
             metrics = self._evaluate_model(y_test, y_pred, ensemble_proba)
@@ -327,9 +362,9 @@ class EnsembleTrainer:
                 lgbm = self._create_lgbm_model()
                 lgbm.fit(X_train, y_train, sample_weight=w_train)
                 lgbm_proba = lgbm.predict_proba(X_test)
-                ensemble_proba = self.xgb_weight * xgb_proba + self.lgbm_weight * lgbm_proba
+                ensemble_proba = self._blend_probabilities(xgb_proba, lgbm_proba)
             else:
-                ensemble_proba = xgb_proba
+                ensemble_proba = self._normalize_probabilities(xgb_proba)
             
             y_pred = (ensemble_proba[:, 1] > 0.5).astype(int)
             
@@ -423,14 +458,14 @@ class EnsembleTrainer:
 
 
 def train_ensemble_model() -> Tuple[Optional[XGBClassifier], Optional[List[str]]]:
-    """Main training function with ensemble and walk-forward validation."""
     os.makedirs("models", exist_ok=True)
+    data_path = str(settings.data.data_path)
     
-    if not os.path.exists(DATA_PATH):
-        logger.error(f"Data file not found: {DATA_PATH}")
+    if not os.path.exists(data_path):
+        logger.error(f"Data file not found: {data_path}")
         return None, None
     
-    df = pd.read_csv(DATA_PATH)
+    df = pd.read_csv(data_path)
     
     trainer = EnsembleTrainer(xgb_weight=0.6, lgbm_weight=0.4)
     

@@ -1,29 +1,19 @@
 #!/usr/bin/env python
-"""
-Bias Audit Script - Data Leakage Verification
-
-This script validates that the trading system does not suffer from look-ahead bias.
-It ensures that features computed for day T do not contain information from day T+1
-or any future dates. This is critical for establishing the credibility of backtest
-results.
-
-Audits performed:
-    1. Feature temporal alignment - no future data leakage in feature computation
-    2. Label independence - training labels derived only from future returns (valid)
-    3. Rolling window verification - all indicators use past data only
-    4. Cross-correlation analysis - features vs future prices correlation check
-"""
+"""Bias Audit Script - Data Leakage Verification."""
 
 import sys
+import os
 import logging
 from typing import Dict, List, Tuple
 
 import pandas as pd
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from src.features.preprocessing import preprocess_pipeline, get_feature_columns
 from src.features.indicators import add_indicators
 from src.features.advanced_features import add_all_features
+from config.settings import settings
 
 logging.basicConfig(
     level=logging.INFO,
@@ -274,10 +264,8 @@ def audit_source_code_patterns() -> Tuple[bool, List[str]]:
 
 
 def main():
-    """Run bias audit on the trading system data."""
-    data_path = "data/raw/NSE_SONATSOFTW-EQ.csv"
+    data_path = str(settings.data.data_path)
     
-    # Run data-based audits
     auditor = BiasAuditor(data_path)
     data_passed = auditor.run_all_audits()
     

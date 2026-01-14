@@ -1,7 +1,7 @@
 Date,Signal,Direction,Confidence,P(Up),P(Down),Expected_Return,Regime,ADX,Rationale
-2026-01-01,HOLD,DOWN,68.16%,31.84%,68.16%,NEGATIVE,UPTREND_STRONG,27.6,Strong directional edge; trending conditions favor continuation; ADX=27.6 confirms trend
-2026-01-02,HOLD,DOWN,68.16%,31.84%,68.16%,NEGATIVE,UPTREND_STRONG,27.6,Strong directional edge; trending conditions favor continuation; ADX=27.6 confirms trend
-2026-01-05,HOLD,DOWN,68.16%,31.84%,68.16%,NEGATIVE,UPTREND_STRONG,27.6,Strong directional edge; trending conditions favor continuation; ADX=27.6 confirms trend
-2026-01-06,HOLD,DOWN,68.16%,31.84%,68.16%,NEGATIVE,UPTREND_STRONG,27.6,Strong directional edge; trending conditions favor continuation; ADX=27.6 confirms trend
-2026-01-07,HOLD,DOWN,68.16%,31.84%,68.16%,NEGATIVE,UPTREND_STRONG,27.6,Strong directional edge; trending conditions favor continuation; ADX=27.6 confirms trend
-2026-01-08,HOLD,DOWN,68.16%,31.84%,68.16%,NEGATIVE,UPTREND_STRONG,27.6,Strong directional edge; trending conditions favor continuation; ADX=27.6 confirms trend
+2026-01-01,HOLD,DOWN,77.65%,22.35%,77.65%,NEGATIVE,UPTREND_STRONG,27.6,Strong directional edge; trending conditions favor continuation; ADX=27.6 confirms trend
+2026-01-02,SELL,DOWN,77.65%,22.35%,77.65%,NEGATIVE,TRANSITIONAL,26.9,Strong directional edge; regime transition in progress; ADX=26.9 confirms trend
+2026-01-05,SELL,DOWN,75.62%,24.38%,75.62%,NEGATIVE,TRANSITIONAL,27.8,Strong directional edge; regime transition in progress; ADX=27.8 confirms trend
+2026-01-06,HOLD,DOWN,54.57%,45.43%,54.57%,FLAT,TRANSITIONAL,29.5,Weak directional signal; regime transition in progress; ADX=29.5 confirms trend
+2026-01-07,HOLD,DOWN,54.57%,45.43%,54.57%,FLAT,TRANSITIONAL,31.7,Weak directional signal; regime transition in progress; ADX=31.7 confirms trend
+2026-01-08,HOLD,UP,53.65%,53.65%,46.35%,FLAT,DOWNTREND_STRONG,34.2,Weak directional signal; trending conditions favor continuation; ADX=34.2 confirms trend

@@ -3,13 +3,13 @@
 Finstreet Trading System
 
 Usage:
-    python run.py fetch      - Fetch data from FYERS (Nov-Dec 2025)
-    python run.py train      - Train XGBoost model (static)
+    python run.py fetch      - Fetch data from FYERS
+    python run.py train      - Train XGBoost model
     python run.py ensemble   - Train ensemble model (XGBoost + LightGBM)
     python run.py backtest   - Run backtest simulation
-    python run.py predict    - Generate Jan 1-8, 2026 predictions (competition requirement)
+    python run.py predict    - Generate Jan 1-8, 2026 predictions
     python run.py visualize  - Generate performance visualizations
-    python run.py all        - Full pipeline (fetch + ensemble + backtest + predict + visualize)
+    python run.py all        - Full pipeline
 """
 
 import sys
@@ -17,17 +17,17 @@ import os
 import logging
 import pandas as pd
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config.settings import settings
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
-
-START_DATE = "2025-11-01"
-END_DATE = "2025-12-31"
 
 
 def fetch_data() -> bool:
     from src.data.fetch_data import fetch_and_save
-    logger.info(f"Fetching data: {START_DATE} to {END_DATE}")
-    df = fetch_and_save(START_DATE, END_DATE)
+    logger.info("Fetching data")
+    df = fetch_and_save()
     if df is not None:
         logger.info(f"Data fetched: {len(df)} rows")
         return True
@@ -66,7 +66,8 @@ def run_backtest() -> bool:
     os.makedirs("reports", exist_ok=True)
 
     logger.info("Running backtest")
-    bt = Backtester("data/raw/NSE_SONATSOFTW-EQ.csv")
+    data_path = str(settings.data.data_path)
+    bt = Backtester(data_path)
     trades, equity = bt.run()
     metrics = bt.calculate_metrics(trades, equity)
 
@@ -84,7 +85,6 @@ def run_backtest() -> bool:
 
 
 def generate_predictions() -> bool:
-    """Generate daily predictions for Jan 1-8, 2026 (competition requirement)."""
     from src.forecast.daily_predictions import DailyPredictionGenerator
     os.makedirs("reports", exist_ok=True)
     
@@ -93,7 +93,7 @@ def generate_predictions() -> bool:
     predictions = generator.generate_all_predictions()
     
     if not predictions:
-        logger.error("Failed to generate predictions - check if model is trained")
+        logger.error("Failed to generate predictions")
         return False
     
     generator.export_csv(predictions)
@@ -103,13 +103,11 @@ def generate_predictions() -> bool:
     print("=" * 80)
     print(generator.format_table(predictions))
     print("=" * 80)
-    print(f"Predictions exported to: reports/daily_predictions.csv")
     
     return True
 
 
 def generate_visualizations() -> bool:
-    """Generate all performance visualizations."""
     from src.visualization.performance import PerformanceVisualizer
     os.makedirs("reports/figures", exist_ok=True)
     
@@ -117,7 +115,7 @@ def generate_visualizations() -> bool:
     
     equity_path = "data/processed/equity.csv"
     trades_path = "data/processed/trades.csv"
-    price_path = "data/raw/NSE_SONATSOFTW-EQ.csv"
+    price_path = str(settings.data.data_path)
     
     if not os.path.exists(equity_path):
         logger.error("Run backtest first to generate equity data")
@@ -139,7 +137,7 @@ def generate_visualizations() -> bool:
     viz = PerformanceVisualizer()
     viz.generate_report(equity, trades_df, price_df=price_df)
     
-    logger.info(f"Visualizations saved to reports/figures/")
+    logger.info("Visualizations saved to reports/figures/")
     return True
 
 

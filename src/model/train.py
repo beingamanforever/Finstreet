@@ -7,27 +7,28 @@ import pandas as pd
 import numpy as np
 from xgboost import XGBClassifier
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import accuracy_score, log_loss, precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, log_loss, f1_score
 import joblib
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.features.preprocessing import preprocess_pipeline, get_feature_columns
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-DATA_PATH = "data/raw/NSE_SONATSOFTW-EQ.csv"
 MODEL_PATH = "models/xgb_model.pkl"
 FEATURES_PATH = "models/features.pkl"
 
 
 def train_model() -> Tuple[Optional[XGBClassifier], Optional[List[str]]]:
     os.makedirs("models", exist_ok=True)
+    data_path = str(settings.data.data_path)
 
-    if not os.path.exists(DATA_PATH):
-        logger.error(f"Data file not found: {DATA_PATH}")
+    if not os.path.exists(data_path):
+        logger.error(f"Data file not found: {data_path}")
         return None, None
 
-    df = pd.read_csv(DATA_PATH)
+    df = pd.read_csv(data_path)
     
     # Competition constraint: Use only Nov 1 - Dec 31, 2025 for training
     # Earlier data is used only for indicator warmup (required for technical features)

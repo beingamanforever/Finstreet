@@ -9,6 +9,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.strategy.strategy import Strategy
+from config.settings import settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -328,7 +329,8 @@ def main():
     os.makedirs("data/processed", exist_ok=True)
     os.makedirs("reports", exist_ok=True)
     
-    bt = Backtester("data/raw/NSE_SONATSOFTW-EQ.csv")
+    data_path = str(settings.data.data_path)
+    bt = Backtester(data_path)
     trades, equity = bt.run()
     metrics = bt.calculate_metrics(trades, equity)
 

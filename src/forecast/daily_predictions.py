@@ -1,23 +1,18 @@
-"""
-Daily Predictions Generator for Competition Compliance
-
-Generates specific Buy/Sell/Hold predictions for Jan 1-8, 2026 trading days
-as required by competition rules. Outputs both CSV and formatted table.
-"""
+"""Daily Predictions Generator for Competition Compliance."""
 
 import os
 import sys
 import logging
 from dataclasses import dataclass
-from typing import List, Dict, Optional
-from datetime import datetime, timedelta
+from typing import List, Optional, Tuple
+from datetime import timedelta
 import pandas as pd
 import numpy as np
 import joblib
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.features.preprocessing import preprocess_pipeline, get_feature_columns
-from src.features.indicators import add_indicators
+from config.settings import settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -29,37 +24,31 @@ ENSEMBLE_PATH = "models/ensemble_model.pkl"
 
 @dataclass
 class DailyPrediction:
-    """Container for a single day's prediction."""
     date: str
-    signal: str  # BUY / SELL / HOLD
-    direction: str  # UP / DOWN / NEUTRAL
+    signal: str
+    direction: str
     confidence: float
     probability_up: float
     probability_down: float
-    expected_return: str  # Categorical: POSITIVE / NEGATIVE / FLAT
+    expected_return: str
     regime: str
     adx_strength: float
     rationale: str
 
 
 class DailyPredictionGenerator:
-    """
-    Generates daily predictions for competition compliance.
-    Combines ML model output with technical regime analysis.
-    """
     
-    # Jan 1-8, 2026 trading days (excluding weekends)
     FORECAST_DATES = [
-        "2026-01-01",  # Thursday
-        "2026-01-02",  # Friday
-        "2026-01-05",  # Monday
-        "2026-01-06",  # Tuesday
-        "2026-01-07",  # Wednesday
-        "2026-01-08",  # Thursday
+        "2026-01-01",
+        "2026-01-02",
+        "2026-01-05",
+        "2026-01-06",
+        "2026-01-07",
+        "2026-01-08",
     ]
     
-    def __init__(self, data_path: str = "data/raw/NSE_SONATSOFTW-EQ.csv"):
-        self.data_path = data_path
+    def __init__(self, data_path: str = None):
+        self.data_path = data_path or str(settings.data.data_path)
         self.model = None
         self.features = None
         self.ensemble = None
@@ -162,59 +151,164 @@ class DailyPredictionGenerator:
         edge = abs(prob_up - prob_down)
         confidence = max(prob_up, prob_down)
         
-        # HOLD conditions
-        if edge < 0.10:  # Weak directional signal
+        if edge < 0.10:
             return "HOLD"
-        if adx < 20 and edge < 0.20:  # Choppy market without strong edge
+        if adx < 20 and edge < 0.20:
             return "HOLD"
-        if confidence < 0.55:  # Low confidence
+        if confidence < 0.55:
             return "HOLD"
         
-        # Directional signals require confluence
         if prob_up > prob_down:
             if "DOWNTREND_STRONG" in regime:
-                return "HOLD"  # Don't buy against strong downtrend
+                return "HOLD"
             return "BUY" if edge > 0.15 or (confidence > 0.60 and adx > 20) else "HOLD"
         else:
             if "UPTREND_STRONG" in regime:
-                return "HOLD"  # Don't sell against strong uptrend
+                return "HOLD"
             return "SELL" if edge > 0.15 or (confidence > 0.60 and adx > 20) else "HOLD"
     
-    def generate_prediction(self, forecast_date: str) -> Optional[DailyPrediction]:
-        """Generate prediction for a specific date."""
-        if not os.path.exists(self.data_path):
-            logger.error(f"Data file not found: {self.data_path}")
-            return None
-            
-        df = pd.read_csv(self.data_path)
-        df["date"] = pd.to_datetime(df["date"])
+    def _simulate_next_bar(
+        self,
+        df: pd.DataFrame,
+        prob_up: float,
+        volatility: float
+    ) -> pd.DataFrame:
+        """
+        Simulate the next bar based on model prediction for recursive forecasting.
         
+        This creates a synthetic bar using:
+        - Direction from model probability
+        - Magnitude from recent volatility
+        - Realistic OHLC relationships
+        """
+        last_row = df.iloc[-1].copy()
+        last_close = last_row["close"]
+        last_date = pd.to_datetime(last_row["date"])
+        
+        # Expected move direction and magnitude
+        direction = 1 if prob_up > 0.5 else -1
+        confidence_factor = abs(prob_up - 0.5) * 2  # Scale 0-1
+        expected_move = direction * volatility * last_close * (0.5 + confidence_factor * 0.5)
+        
+        # Add some uncertainty/noise proportional to confidence
+        noise_factor = 1 - confidence_factor
+        noise = np.random.normal(0, volatility * last_close * noise_factor * 0.3)
+        
+        # Simulated close
+        sim_close = last_close + expected_move + noise
+        
+        # Generate realistic OHLC
+        intraday_range = volatility * last_close
+        if direction > 0:
+            sim_open = last_close + np.random.uniform(-0.2, 0.3) * intraday_range
+            sim_high = max(sim_open, sim_close) + np.random.uniform(0, 0.5) * intraday_range
+            sim_low = min(sim_open, sim_close) - np.random.uniform(0, 0.3) * intraday_range
+        else:
+            sim_open = last_close + np.random.uniform(-0.3, 0.2) * intraday_range
+            sim_high = max(sim_open, sim_close) + np.random.uniform(0, 0.3) * intraday_range
+            sim_low = min(sim_open, sim_close) - np.random.uniform(0, 0.5) * intraday_range
+        
+        # Volume based on recent average with some variation
+        avg_volume = df["volume"].tail(10).mean()
+        sim_volume = avg_volume * np.random.uniform(0.7, 1.3)
+        
+        # Create new row
+        next_date = last_date + timedelta(days=1)
+        while next_date.weekday() >= 5:  # Skip weekends
+            next_date += timedelta(days=1)
+        
+        new_row = pd.DataFrame({
+            "date": [next_date],
+            "open": [sim_open],
+            "high": [sim_high],
+            "low": [sim_low],
+            "close": [sim_close],
+            "volume": [int(sim_volume)]
+        })
+        
+        return pd.concat([df, new_row], ignore_index=True)
+    
+    def _get_ensemble_prediction(
+        self,
+        feature_values: pd.DataFrame
+    ) -> Tuple[float, float]:
+        """
+        Get blended prediction from XGBoost and LightGBM ensemble.
+        Properly normalizes probabilities to sum to 1.
+        """
+        # Primary model prediction
+        proba = self.model.predict_proba(feature_values)[0]
+        p_down, p_up = float(proba[0]), float(proba[1])
+        
+        # Blend with ensemble if available
+        if self.ensemble is not None:
+            try:
+                ensemble_proba = self.ensemble.predict_proba(feature_values)[0]
+                # Weighted average: 60% XGBoost, 40% LightGBM
+                p_down = 0.6 * p_down + 0.4 * float(ensemble_proba[0])
+                p_up = 0.6 * p_up + 0.4 * float(ensemble_proba[1])
+                
+                # Normalize to ensure sum = 1
+                total = p_down + p_up
+                if total > 0:
+                    p_down /= total
+                    p_up /= total
+            except Exception:
+                pass
+        
+        return p_up, p_down
+    
+    def generate_prediction_t1(self, df: pd.DataFrame) -> Optional[Dict]:
+        """
+        Generate T+1 (tomorrow) prediction from current data state.
+        
+        This is the core prediction function that takes current market data
+        and produces a single next-day forecast.
+        """
         if self.model is None:
             logger.error("Model not loaded")
             return None
         
-        df_processed = preprocess_pipeline(df, is_training=False)
+        df_processed = preprocess_pipeline(df.copy(), is_training=False)
         if df_processed.empty:
             return None
         
         feature_values = df_processed.iloc[[-1]][self.features].fillna(0)
-        
-        # Get primary model predictions
-        proba = self.model.predict_proba(feature_values)[0]
-        p_down, p_up = float(proba[0]), float(proba[1])
-        
-        # If ensemble exists, blend predictions
-        if self.ensemble is not None:
-            try:
-                ensemble_proba = self.ensemble.predict_proba(feature_values)[0]
-                # Weighted average: 60% primary, 40% ensemble
-                p_down = 0.6 * p_down + 0.4 * float(ensemble_proba[0])
-                p_up = 0.6 * p_up + 0.4 * float(ensemble_proba[1])
-            except Exception:
-                pass  # Fall back to primary model only
+        p_up, p_down = self._get_ensemble_prediction(feature_values)
         
         regime = self._get_regime(df)
         adx = self._compute_adx(df).iloc[-1]
+        
+        # Calculate recent volatility for simulation
+        returns = df["close"].pct_change().dropna()
+        volatility = returns.tail(20).std() if len(returns) >= 20 else returns.std()
+        
+        return {
+            "p_up": p_up,
+            "p_down": p_down,
+            "regime": regime,
+            "adx": adx,
+            "volatility": volatility if not np.isnan(volatility) else 0.02
+        }
+    
+    def generate_prediction(self, forecast_date: str, df: pd.DataFrame = None) -> Optional[DailyPrediction]:
+        """Generate prediction for a specific date using current data state."""
+        if df is None:
+            if not os.path.exists(self.data_path):
+                logger.error(f"Data file not found: {self.data_path}")
+                return None
+            df = pd.read_csv(self.data_path)
+            df["date"] = pd.to_datetime(df["date"])
+        
+        result = self.generate_prediction_t1(df)
+        if result is None:
+            return None
+        
+        p_up = result["p_up"]
+        p_down = result["p_down"]
+        regime = result["regime"]
+        adx = result["adx"]
+        
         signal = self._determine_signal(p_up, p_down, regime, adx)
         rationale = self._generate_rationale(p_up, p_down, regime, adx)
         
@@ -235,14 +329,49 @@ class DailyPredictionGenerator:
         )
     
     def generate_all_predictions(self) -> List[DailyPrediction]:
-        """Generate predictions for all forecast dates (Jan 1-8, 2026)."""
+        """
+        Generate predictions for all forecast dates using recursive forecasting.
+        
+        For each day beyond T+1, we simulate the expected market state based
+        on previous predictions, then generate a fresh prediction. This produces
+        unique confidence values that evolve based on projected market conditions.
+        """
         predictions = []
         
-        for date in self.FORECAST_DATES:
-            pred = self.generate_prediction(date)
+        if not os.path.exists(self.data_path):
+            logger.error(f"Data file not found: {self.data_path}")
+            return predictions
+        
+        # Load base data
+        df = pd.read_csv(self.data_path)
+        df["date"] = pd.to_datetime(df["date"])
+        
+        # Set random seed for reproducibility
+        np.random.seed(42)
+        
+        for i, forecast_date in enumerate(self.FORECAST_DATES):
+            if i == 0:
+                # First prediction: use actual data
+                pred = self.generate_prediction(forecast_date, df)
+            else:
+                # Subsequent predictions: use simulated forward data
+                result = self.generate_prediction_t1(df)
+                if result is None:
+                    continue
+                
+                # Simulate next bar based on prediction
+                df = self._simulate_next_bar(
+                    df,
+                    result["p_up"],
+                    result["volatility"]
+                )
+                
+                # Generate prediction for this simulated state
+                pred = self.generate_prediction(forecast_date, df)
+            
             if pred:
                 predictions.append(pred)
-                
+        
         return predictions
     
     def to_dataframe(self, predictions: List[DailyPrediction]) -> pd.DataFrame:
@@ -270,6 +399,43 @@ class DailyPredictionGenerator:
         df.to_csv(path, index=False)
         logger.info(f"Predictions exported to {path}")
     
+    def generate_chart(self, predictions: List[DailyPrediction], output_dir: str = "reports/figures") -> None:
+        """Generate predictions visualization chart."""
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Patch
+        
+        os.makedirs(output_dir, exist_ok=True)
+        
+        plt.style.use("seaborn-v0_8-whitegrid")
+        fig, ax = plt.subplots(figsize=(12, 6))
+        
+        dates = [p.date for p in predictions]
+        confidences = [p.confidence for p in predictions]
+        directions = [p.direction for p in predictions]
+        
+        colors = ["#2E86AB" if d == "UP" else "#E63946" for d in directions]
+        ax.bar(range(len(dates)), confidences, color=colors, alpha=0.8, edgecolor="black", linewidth=1)
+        
+        ax.axhline(y=0.5, color="gray", linestyle="--", linewidth=1.5, label="Neutral (50%)")
+        
+        ax.set_xticks(range(len(dates)))
+        ax.set_xticklabels([d.split("-")[1] + "/" + d.split("-")[2] for d in dates], fontsize=10, rotation=45)
+        ax.set_ylabel("Confidence", fontsize=11)
+        ax.set_xlabel("Date (Jan 2026)", fontsize=11)
+        ax.set_title("Daily Prediction Confidence (Jan 1-8, 2026)", fontweight="bold", fontsize=14)
+        ax.set_ylim(0, 1)
+        
+        legend_elements = [
+            Patch(facecolor="#2E86AB", edgecolor="black", label="UP"),
+            Patch(facecolor="#E63946", edgecolor="black", label="DOWN"),
+        ]
+        ax.legend(handles=legend_elements, loc="upper right")
+        ax.grid(axis="y", alpha=0.3)
+        
+        plt.tight_layout()
+        fig.savefig(f"{output_dir}/predictions_chart.png", bbox_inches="tight", dpi=120)
+        plt.close()
+    
     def format_table(self, predictions: List[DailyPrediction]) -> str:
         """Format predictions as markdown table for README."""
         lines = []
@@ -294,6 +460,7 @@ def generate_predictions() -> str:
         return "Predictions unavailable - model not trained or data missing"
     
     generator.export_csv(predictions)
+    generator.generate_chart(predictions)
     
     return generator.format_table(predictions)
 

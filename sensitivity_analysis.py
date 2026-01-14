@@ -1,11 +1,4 @@
-"""
-Parameter Sensitivity Analysis
-
-Tests strategy robustness by varying key parameters and recording performance.
-This demonstrates the strategy is not overfit to a single parameter configuration.
-
-Run: python sensitivity_analysis.py
-"""
+"""Parameter Sensitivity Analysis."""
 
 import os
 import sys
@@ -21,10 +14,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from src.strategy.trend_momentum import TrendMomentum, Config as TMConfig
 from src.strategy.strategy import Strategy
 from src.backtest.backtest import Backtester, Config as BTConfig
+from config.settings import settings
 
 logging.basicConfig(level=logging.WARNING, format='%(message)s')
-
-DATA_PATH = "data/raw/NSE_SONATSOFTW-EQ.csv"
 
 
 @dataclass
@@ -105,7 +97,8 @@ def run_sensitivity_analysis() -> pd.DataFrame:
             )
             
             try:
-                backtester = ParameterizedBacktester(DATA_PATH, 100000, tm_config)
+                data_path = str(settings.data.data_path)
+                backtester = ParameterizedBacktester(data_path, 100000, tm_config)
                 
                 # Debug: Verify config was applied
                 actual_pullback = backtester.strategy.trend.cfg.pullback_pct

@@ -428,6 +428,87 @@ class PerformanceVisualizer:
         
         return fig
 
+    def plot_confusion_matrix_from_metrics(self, save: bool = True) -> Optional[plt.Figure]:
+        """Generate confusion matrix from saved model metrics."""
+        metrics_path = Path("models/model_metrics.csv")
+        if not metrics_path.exists():
+            return None
+            
+        metrics_df = pd.read_csv(metrics_path)
+        
+        tp = int(metrics_df["true_positives"].iloc[-1])
+        tn = int(metrics_df["true_negatives"].iloc[-1])
+        fp = int(metrics_df["false_positives"].iloc[-1])
+        fn = int(metrics_df["false_negatives"].iloc[-1])
+        
+        cm = np.array([[tn, fp], [fn, tp]])
+        
+        fig, ax = plt.subplots(figsize=(8, 6))
+        im = ax.imshow(cm, cmap="Blues")
+        
+        ax.set_xticks([0, 1])
+        ax.set_yticks([0, 1])
+        ax.set_xticklabels(["Predicted DOWN", "Predicted UP"], fontsize=11)
+        ax.set_yticklabels(["Actual DOWN", "Actual UP"], fontsize=11)
+        
+        for i in range(2):
+            for j in range(2):
+                total = max(cm.sum(), 1)
+                value = cm[i, j]
+                pct = value / total * 100
+                text = f"{value}\n({pct:.1f}%)"
+                color = "white" if value > total / 4 else "black"
+                ax.text(j, i, text, ha="center", va="center", fontsize=14, color=color, fontweight="bold")
+        
+        total = max(tp + tn + fp + fn, 1)
+        acc = (tp + tn) / total
+        prec = tp / max(tp + fp, 1)
+        rec = tp / max(tp + fn, 1)
+        f1 = 2 * tp / max(2 * tp + fp + fn, 1)
+        
+        metrics_text = f"Accuracy: {acc:.1%}\nPrecision: {prec:.1%}\nRecall: {rec:.1%}\nF1 Score: {f1:.1%}"
+        ax.text(1.35, 0.5, metrics_text, transform=ax.transAxes, fontsize=11, verticalalignment="center",
+                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5))
+        
+        ax.set_title("Model Confusion Matrix", fontweight="bold", fontsize=14)
+        plt.colorbar(im, ax=ax, shrink=0.8)
+        plt.tight_layout()
+        
+        if save:
+            fig.savefig(self.output_dir / "confusion_matrix.png", bbox_inches="tight", dpi=120)
+        
+        plt.close()
+        return fig
+
+    def plot_feature_importance(self, save: bool = True) -> Optional[plt.Figure]:
+        """Generate feature importance chart from saved metrics."""
+        importance_path = Path("models/feature_importance.csv")
+        if not importance_path.exists():
+            return None
+            
+        importance_df = pd.read_csv(importance_path)
+        top_features = importance_df.nlargest(15, "importance")
+        
+        fig, ax = plt.subplots(figsize=(10, 8))
+        
+        colors = plt.cm.Blues(np.linspace(0.4, 0.9, len(top_features)))[::-1]
+        ax.barh(range(len(top_features)), top_features["importance"].values, color=colors)
+        
+        ax.set_yticks(range(len(top_features)))
+        ax.set_yticklabels(top_features["feature"].values, fontsize=10)
+        ax.set_xlabel("Importance Score", fontsize=11)
+        ax.set_title("Top 15 Feature Importance", fontweight="bold", fontsize=14)
+        ax.invert_yaxis()
+        ax.grid(axis="x", alpha=0.3)
+        
+        plt.tight_layout()
+        
+        if save:
+            fig.savefig(self.output_dir / "feature_importance.png", bbox_inches="tight", dpi=120)
+        
+        plt.close()
+        return fig
+
     def generate_report(
         self,
         equity: pd.Series,
@@ -453,6 +534,10 @@ class PerformanceVisualizer:
         # Price chart with trades if data available
         if price_df is not None and not trades.empty:
             self.plot_trades_on_price(price_df, trades)
+        
+        # Model performance visualizations
+        self.plot_confusion_matrix_from_metrics()
+        self.plot_feature_importance()
 
     def calculate_metrics(self, equity: pd.Series) -> dict:
         returns = equity.pct_change().dropna()

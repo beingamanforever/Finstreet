@@ -33,6 +33,7 @@ def get_feature_columns(df: pd.DataFrame) -> List[str]:
     exclude = [
         "date", "open", "high", "low", "close", "volume",
         "label", "label_3class", "t1", "future_return",
-        "barrier_touched", "sample_weight", "typical_price"
+        "barrier_touched", "sample_weight", "typical_price",
+        "raw_label", "atr", "significance_threshold"
     ]
     return [col for col in df.columns if col not in exclude]

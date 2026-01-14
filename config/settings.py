@@ -1,6 +1,4 @@
-"""
-Centralized configuration management for the trading system.
-"""
+"""Centralized configuration for the trading system."""
 
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -8,14 +6,35 @@ from pathlib import Path
 import os
 
 
+def get_symbol_name(symbol: str) -> str:
+    """Extract clean symbol name from full symbol string."""
+    return symbol.replace("NSE:", "").replace("-EQ", "")
+
+
+def get_data_filename(symbol: str) -> str:
+    """Generate data filename from symbol."""
+    return f"NSE_{get_symbol_name(symbol)}-EQ.csv"
+
+
 @dataclass
 class DataConfig:
-    """Configuration for data acquisition and storage."""
     raw_data_dir: Path = Path("data/raw")
     processed_data_dir: Path = Path("data/processed")
     default_symbol: str = "NSE:SONATSOFTW-EQ"
     default_resolution: str = "D"
     lookback_days: int = 365
+    
+    @property
+    def symbol_name(self) -> str:
+        return get_symbol_name(self.default_symbol)
+    
+    @property
+    def data_file(self) -> str:
+        return get_data_filename(self.default_symbol)
+    
+    @property
+    def data_path(self) -> Path:
+        return self.raw_data_dir / self.data_file
 
 
 @dataclass
