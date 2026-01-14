@@ -4,7 +4,6 @@
 
 **ML-Driven Trend-Following Strategy for NSE Equities**
 
-*KSHITIJ 2026 · IIT Kharagpur*
 
 [![Strategy Audit](https://github.com/beingamanforever/Finstreet/actions/workflows/sanity_check.yml/badge.svg)](https://github.com/beingamanforever/Finstreet/actions/workflows/sanity_check.yml)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
