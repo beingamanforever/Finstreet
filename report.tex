@@ -36,7 +36,6 @@
 
 \begin{document}
 
-% ============ HEADER ============
 \begin{center}
     {\LARGE\bfseries\color{accent} ML-Driven Trading System for Sonata Software}\\[3pt]
     \textbf{KSHITIJ 2026} · FinStreet Hackathon · IIT Kharagpur\\[2pt]
@@ -47,7 +46,6 @@
 \hrule height 0.5pt
 \vspace{4pt}
 
-% ============ KEY METRICS BOX ============
 \begin{tcolorbox}[colframe=success, colback=white, boxsep=3pt]
 \begin{center}
 \begin{tabular}{ccccc}
@@ -59,25 +57,22 @@
 
 \vspace{-4pt}
 
-% ============ TWO COLUMN LAYOUT ============
 \begin{multicols}{2}
 
-% ------ WHAT ------
-\section{What We Built}
+\section{System Overview}
 
 \begin{tcolorbox}
 \small
-\textbf{Trend-following system} that:
+\textbf{Trend-following system} with:
 \begin{itemize}[leftmargin=10pt, itemsep=-1pt, topsep=1pt]
-    \item Trades \textbf{only} in trend direction
-    \item Enters on \textbf{pullbacks}, not reversals
-    \item Uses ML as a \textbf{filter}, not predictor
-    \item Prioritizes \textbf{capital preservation}
+    \item Trades only in trend direction
+    \item Enters on pullbacks, not reversals
+    \item ML ensemble as validation filter
+    \item ATR-based dynamic risk management
 \end{itemize}
 \end{tcolorbox}
 
-% ------ HOW ------
-\section{How It Works}
+\section{Execution Flow}
 
 \begin{tcolorbox}
 \footnotesize
@@ -88,24 +83,10 @@
 2. Entry & Wait for 6\% pullback \\
 3. Validate & ML confirms direction \\
 4. Size & Scale by confidence \\
-5. Manage & ATR-based stops \\
+5. Exit & ATR-based stops \\
 \end{tabular}
 \end{tcolorbox}
 
-% ------ WHY ------
-\section{Why This Approach}
-
-\begin{tcolorbox}
-\small
-\begin{itemize}[leftmargin=10pt, itemsep=-1pt, topsep=1pt]
-    \item Sonata showed \textbf{continuation patterns}
-    \item Mean-reversion \textbf{failed} in backtest
-    \item Pullbacks = \textbf{low-risk entries}
-    \item ML filters \textbf{bad setups}
-\end{itemize}
-\end{tcolorbox}
-
-% ------ ML COMPONENT ------
 \section{ML Component}
 
 \begin{tcolorbox}
@@ -114,14 +95,30 @@
 
 \vspace{1pt}
 \begin{tabular}{@{}ll@{}}
-\textbf{Input} & RSI, MACD, ADX features \\
+\textbf{Input} & RSI, MACD, ADX, KER features \\
 \textbf{Output} & P(Up) vs P(Down) \\
-\textbf{Role} & Reject Tech $\neq$ ML trades \\
-\textbf{Training} & Walk-forward, no leakage \\
+\textbf{Role} & Reject misaligned trades \\
+\textbf{Training} & Walk-forward validation \\
 \end{tabular}
 \end{tcolorbox}
 
-% ------ RISK MANAGEMENT ------
+\section{Parameter Robustness}
+
+\begin{tcolorbox}
+\footnotesize
+\begin{tabular}{@{}lccc@{}}
+\textbf{Parameter} & \textbf{Range} & \textbf{Selected} & \textbf{Sharpe} \\
+\midrule
+Pullback & 4--10\% & 6\% & 5.27--6.61 \\
+Stop ATR & 1.2--2.0x & 1.5x & 6.61 \\
+Target ATR & 2.5--5.0x & 3.0x & 6.61 \\
+ADX Filter & 12--20 & 15 & 6.61 \\
+\end{tabular}
+
+\vspace{2pt}
+Only pullback shows sensitivity. Others invariant.
+\end{tcolorbox}
+
 \section{Risk Management}
 
 \begin{tcolorbox}
@@ -129,41 +126,17 @@
 \begin{tabular}{@{}ll@{}}
 \textbf{Control} & \textbf{Rule} \\
 \midrule
-Position Size & $\text{risk} = \text{base} \times (0.5 + \text{conf})$ \\
+Position Size & $\text{risk} = \text{base} \times (\text{conf} / 0.70)$ \\
 Max Risk & 5\% per trade \\
 Stop Loss & 1.5$\times$ ATR \\
 Take Profit & 3$\times$ ATR \\
-Trailing & 2.5$\times$ ATR \\
-Regime Filter & ADX $<$ 15 $\rightarrow$ no trade \\
+Trailing Stop & 2.5$\times$ ATR \\
+Regime Filter & ADX $<$ 15 $\rightarrow$ skip \\
 \end{tabular}
 \end{tcolorbox}
 
 \columnbreak
 
-% ------ OPTIMIZATION ------
-\section{Parameter Optimization}
-
-\begin{tcolorbox}
-\footnotesize
-\textbf{Method:} Randomized search (150 configs)
-
-\vspace{1pt}
-\begin{tabular}{@{}lcc@{}}
-\textbf{Param} & \textbf{Range} & \textbf{Best} \\
-\midrule
-Pullback & 6--12\% & \textbf{6\%} \\
-Risk/Trade & 2--5\% & \textbf{3--5\%} \\
-Stop ATR & 1.2--1.8$\times$ & \textbf{1.5$\times$} \\
-Target ATR & 3--6$\times$ & \textbf{3$\times$} \\
-ADX Min & 12--18 & \textbf{15} \\
-Trailing & 1.5--2.5$\times$ & \textbf{2.5$\times$} \\
-\end{tabular}
-
-\vspace{1pt}
-\textbf{Objective:} Max(Return $\times$ Sharpe) $-$ DD penalty
-\end{tcolorbox}
-
-% ------ BACKTEST ------
 \section{Backtest Results}
 
 \begin{tcolorbox}
@@ -173,48 +146,43 @@ Trailing & 1.5--2.5$\times$ & \textbf{2.5$\times$} \\
 \midrule
 Period & Nov--Dec 2025 & Trades & 9 \\
 Symbol & SONATSOFTW & Winners & 8 \\
-Capital & ₹100,000 & Win Rate & 88.9\% \\
-Final & ₹101,314 & Sharpe & 6.62 \\
+Capital & INR 100,000 & Win Rate & 88.9\% \\
+Final & INR 101,314 & Sharpe & 6.62 \\
 Return & 1.31\% & Max DD & 0.05\% \\
 \end{tabular}
 \end{tcolorbox}
 
-% ------ PREDICTIONS ------
-\section{Forward Predictions (Jan 1-8, 2026)}
+\section{Forward Predictions (Jan 1--8, 2026)}
 
 \begin{tcolorbox}
 \footnotesize
-\textit{XGBoost output on Dec 31, 2025 state:}
-
-\vspace{1pt}
-\begin{tabular}{@{}lccc@{}}
-\textbf{Date} & \textbf{Signal} & \textbf{Conf} & \textbf{Regime} \\
+\begin{tabular}{@{}lcccc@{}}
+\textbf{Date} & \textbf{Signal} & \textbf{Dir} & \textbf{Conf} & \textbf{Regime} \\
 \midrule
-Jan 1 & HOLD & 69\% & Uptrend \\
-Jan 2 & HOLD & 69\% & Uptrend \\
-Jan 5 & HOLD & 69\% & Uptrend \\
-Jan 6 & HOLD & 69\% & Uptrend \\
-Jan 7 & HOLD & 69\% & Uptrend \\
-Jan 8 & HOLD & 69\% & Uptrend \\
+Jan 1 & HOLD & DOWN & 68\% & Uptrend \\
+Jan 2 & HOLD & DOWN & 68\% & Uptrend \\
+Jan 5 & HOLD & DOWN & 68\% & Uptrend \\
+Jan 6 & HOLD & DOWN & 68\% & Uptrend \\
+Jan 7 & HOLD & DOWN & 68\% & Uptrend \\
+Jan 8 & HOLD & DOWN & 68\% & Uptrend \\
 \end{tabular}
 
 \vspace{1pt}
-\textit{HOLD = ML direction conflicts with technical regime}
+\textit{Model predicts DOWN but regime is Uptrend. Conservative approach: HOLD.}
 \end{tcolorbox}
 
-% ------ COMPLIANCE ------
-\section{Data Integrity \& Compliance}
+\section{Data Integrity}
 
 \begin{tcolorbox}
 \footnotesize
 \begin{tabular}{@{}ll@{}}
 \textbf{Check} & \textbf{Status} \\
 \midrule
-No future data in features & \textcolor{success}{\textbf{✓}} \\
-Labels from T+2 to T+5 returns & \textcolor{success}{\textbf{✓}} \\
-Walk-forward validation & \textcolor{success}{\textbf{✓}} \\
-FYERS API only (data + exec) & \textcolor{success}{\textbf{✓}} \\
-Audit script passed & \textcolor{success}{\textbf{✓}} \\
+No future data in features & \textcolor{success}{\textbf{PASS}} \\
+Labels from T+2 to T+5 returns & \textcolor{success}{\textbf{PASS}} \\
+Walk-forward validation & \textcolor{success}{\textbf{PASS}} \\
+FYERS API only & \textcolor{success}{\textbf{PASS}} \\
+Audit script passed & \textcolor{success}{\textbf{PASS}} \\
 \end{tabular}
 \end{tcolorbox}
 
@@ -224,22 +192,21 @@ Audit script passed & \textcolor{success}{\textbf{✓}} \\
 \hrule height 0.5pt
 \vspace{3pt}
 
-% ============ ARCHITECTURE DIAGRAM ============
 \begin{center}
 \footnotesize
-\texttt{FYERS API} $\rightarrow$ \texttt{Features (RSI, MACD, ADX)} $\rightarrow$ \texttt{XGBoost+LightGBM} $\rightarrow$ \texttt{Signal Gate} $\rightarrow$ \texttt{Risk Mgmt} $\rightarrow$ \texttt{Execute}
+\texttt{FYERS API} $\rightarrow$ \texttt{Features} $\rightarrow$ \texttt{XGBoost+LightGBM} $\rightarrow$ \texttt{Signal Gate} $\rightarrow$ \texttt{Risk Mgmt} $\rightarrow$ \texttt{Execute}
 \end{center}
 
 \vspace{1pt}
 
-% ============ FOOTER ============
 \begin{tcolorbox}[colback=white, colframe=muted, boxsep=2pt]
 \begin{center}
 \footnotesize
-\textbf{Key Insight:} High win rate (88.9\%) + tight stops (1.5× ATR) + minimal drawdown (0.05\%) = \textbf{sustainable edge}\\
-System compounds small, consistent gains while protecting capital — built for real-world deployment.
+\textbf{Key Insight:} High win rate (88.9\%) + tight stops (1.5x ATR) + minimal drawdown (0.05\%) = sustainable edge.
+System compounds small, consistent gains while preserving capital.
 \end{center}
 \end{tcolorbox}
+
 \newpage
 
 \begin{center}
@@ -250,58 +217,45 @@ System compounds small, consistent gains while protecting capital — built for 
 \hrule height 0.5pt
 \vspace{6pt}
 
-% ================= DATA + LOGIC =================
 \begin{tcolorbox}
 \small
 All market data is sourced exclusively from the \textbf{FYERS API} using daily OHLCV candles.
-Data from \textbf{Jan–Oct 2025} is used only for indicator warmup
-(e.g., moving averages, momentum) and is never used for model training
-or trade decisions.
-
-Model training and backtesting are restricted to the permitted window
-from \textbf{November 1 to December 31, 2025}.
-Forward signals for \textbf{January 1–8, 2026} are generated as a true out-of-sample forecast.
+Data from \textbf{Jan--Oct 2025} is used only for indicator warmup and is never used for model training or trade decisions.
+Model training and backtesting are restricted to \textbf{November 1 -- December 31, 2025}.
+Forward signals for \textbf{January 1--8, 2026} are generated as true out-of-sample forecasts.
 
 The strategy is rule-based and structure-driven.
-Trend direction is identified using the EMA(10)–SMA(20) relationship and its slope,
-with entries taken only on controlled pullbacks within an established trend
-to improve risk–reward.
+Trend direction is identified using the EMA(10)--SMA(20) relationship and slope, with entries taken only on controlled pullbacks within an established trend.
+The Kaufman Efficiency Ratio (KER) provides additional trend quality assessment.
 \end{tcolorbox}
 
 \vspace{6pt}
 
-% ================= EQUITY + DRAWDOWN =================
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.75\linewidth]{equity_drawdown_dual.png}
-    \caption{\small Equity curve and drawdown during the Nov–Dec 2025 backtest period}
+    \caption{\small Equity curve and drawdown during the Nov--Dec 2025 backtest period}
 \end{figure}
 
 \vspace{4pt}
 
-% ================= EXECUTION + BIAS =================
 \begin{tcolorbox}
 \small
-Machine learning is used only as a validation layer.
-It estimates directional confidence from recent trend, momentum, volatility,
-and volume features, and does not predict prices or returns.
-Trades are taken only when ML and technical signals align;
-otherwise, they are skipped.
+Machine learning serves as a validation layer, not a predictor.
+The XGBoost + LightGBM ensemble estimates directional confidence from trend, momentum, volatility, and volume features.
+Trades execute only when ML and technical signals align; otherwise, they are skipped.
 
 Backtesting follows a strict chronological walk-forward process.
 Signals are generated after market close and executed at the next session open.
-Exits are evaluated using intraday high and low prices,
-with positions closed at end-of-day if neither stop-loss nor target is reached.
+Exits are evaluated using intraday high/low prices for realistic stop-loss and take-profit triggers.
 
-A dedicated audit process verifies the absence of look-ahead bias.
-Features use only past data, rolling indicators respect their lookback windows,
-and labels are derived from forward returns by design.
+A dedicated audit process verifies absence of look-ahead bias.
+Features use only past data, rolling indicators respect their lookback windows, and labels are derived from forward returns by design.
+Triple-barrier labeling uses high/low prices for barrier detection.
 \end{tcolorbox}
-
 
 \vspace{6pt}
 
-% ================= PRICE + DISTRIBUTION =================
 \begin{figure}[h!]
 \centering
 \begin{minipage}{0.48\linewidth}
@@ -324,10 +278,7 @@ and labels are derived from forward returns by design.
 \begin{center}
 \footnotesize
 \textbf{Summary:}
-A rule-based trend-following system enhanced by probabilistic validation,
-evaluated under strict data constraints with realistic execution
-and no look-ahead bias.
+A rule-based trend-following system with probabilistic validation, evaluated under strict data constraints with realistic execution and verified absence of look-ahead bias.
 \end{center}
-
 
 \end{document}

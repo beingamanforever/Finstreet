@@ -219,14 +219,84 @@ class BiasAuditor:
         return valid_label_construction, details
 
 
+def audit_source_code_patterns() -> Tuple[bool, List[str]]:
+    """
+    Static analysis to detect common data leakage patterns in source code.
+    
+    Checks for:
+    - .bfill() without justification (backward fill uses future data)
+    - .shift(-N) where N > 0 (accessing future rows) in feature code
+    - rolling().apply() with rank() that could leak
+    """
+    import re
+    from pathlib import Path
+    
+    details = []
+    violations = []
+    
+    feature_files = [
+        "src/features/labeling.py",
+        "src/features/indicators.py",
+        "src/features/advanced_features.py",
+        "src/features/preprocessing.py",
+    ]
+    
+    patterns = {
+        r'\.bfill\(\)': "bfill() without expanding/ffill alternative",
+        r'\.shift\s*\(\s*-\d': "shift(-N) accesses future data",
+        r'rolling\([^)]+\)\.apply\([^)]*rank\(pct=True\)': "rolling rank may leak future data",
+    }
+    
+    for filepath in feature_files:
+        try:
+            with open(filepath, 'r') as f:
+                content = f.read()
+                lines = content.split('\n')
+                
+                for pattern, description in patterns.items():
+                    for i, line in enumerate(lines, 1):
+                        # Skip comments
+                        if line.strip().startswith('#'):
+                            continue
+                        if re.search(pattern, line):
+                            violations.append(f"{filepath}:{i} - {description}")
+        except FileNotFoundError:
+            pass
+            
+    passed = len(violations) == 0
+    details.append(f"Scanned {len(feature_files)} feature files for leakage patterns")
+    details.append(f"Code pattern violations: {len(violations)}")
+    
+    for v in violations[:5]:
+        details.append(f"  {v}")
+        
+    return passed, details
+
+
 def main():
     """Run bias audit on the trading system data."""
     data_path = "data/raw/NSE_SONATSOFTW-EQ.csv"
     
+    # Run data-based audits
     auditor = BiasAuditor(data_path)
-    passed = auditor.run_all_audits()
+    data_passed = auditor.run_all_audits()
     
-    sys.exit(0 if passed else 1)
+    # Run source code pattern audit
+    logger.info("\n")
+    logger.info("=" * 60)
+    logger.info("SOURCE CODE PATTERN AUDIT")
+    logger.info("=" * 60)
+    
+    code_passed, code_details = audit_source_code_patterns()
+    status = "PASS" if code_passed else "FAIL"
+    logger.info(f"[{status}] Source Code Leakage Patterns")
+    for detail in code_details:
+        logger.info(f"       {detail}")
+    
+    logger.info("=" * 60)
+    
+    overall_passed = data_passed and code_passed
+    sys.exit(0 if overall_passed else 1)
 
 
 if __name__ == "__main__":

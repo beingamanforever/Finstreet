@@ -174,8 +174,15 @@ class EnsembleTrainer:
         prec = precision_score(y_true, y_pred, zero_division=0)
         rec = recall_score(y_true, y_pred, zero_division=0)
         f1 = f1_score(y_true, y_pred, zero_division=0)
-        ll = log_loss(y_true, y_proba)
-        cm = confusion_matrix(y_true, y_pred)
+        
+        # Handle single-class case in log_loss
+        unique_classes = np.unique(y_true)
+        if len(unique_classes) < 2:
+            ll = 0.0  # No meaningful log_loss with single class
+        else:
+            ll = log_loss(y_true, y_proba, labels=[0, 1])
+        
+        cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
         kelly = calculate_kelly_fraction(y_true, y_pred, y_proba)
         
         return ModelMetrics(
@@ -359,10 +366,14 @@ class EnsembleTrainer:
         if self.xgb_model is not None:
             joblib.dump(self.xgb_model, MODEL_PATH)
             logger.info(f"XGBoost model saved to {MODEL_PATH}")
+        else:
+            logger.warning("XGBoost model is None - not saved")
         
         if self.lgbm_model is not None:
             joblib.dump(self.lgbm_model, ENSEMBLE_PATH)
             logger.info(f"LightGBM model saved to {ENSEMBLE_PATH}")
+        else:
+            logger.warning(f"LightGBM model is None - not saved (LIGHTGBM_AVAILABLE={LIGHTGBM_AVAILABLE})")
         
         if self.features is not None:
             joblib.dump(self.features, FEATURES_PATH)

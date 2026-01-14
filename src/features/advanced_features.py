@@ -35,8 +35,8 @@ def add_volatility_features(df: pd.DataFrame) -> pd.DataFrame:
     returns = df["close"].pct_change()
 
     df["realized_vol_20"] = returns.rolling(20).std() * np.sqrt(252)
-    df["vol_percentile"] = df["realized_vol_20"].rolling(60).apply(
-        lambda x: pd.Series(x).rank(pct=True).iloc[-1] if len(x) > 0 else np.nan
+    df["vol_percentile"] = df["realized_vol_20"].expanding(min_periods=20).apply(
+        lambda x: (x.iloc[-1] <= x).sum() / len(x) if len(x) > 0 else 0.5
     )
 
     df["hl_range"] = (df["high"] - df["low"]) / df["close"]

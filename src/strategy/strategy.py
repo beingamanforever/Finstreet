@@ -24,14 +24,7 @@ class Params:
 
 
 class Strategy:
-    """
-    Enhanced trading strategy with:
-    - Dynamic position sizing based on confidence
-    - ADX-based regime filtering
-    - Multi-timeframe trend alignment
-    - Volume confirmation
-    - ML signal filtering
-    """
+    """Trading strategy with dynamic position sizing and ML signal filtering."""
     
     def __init__(self, capital: float = 100_000.0):
         self.capital = capital
@@ -81,12 +74,9 @@ class Strategy:
         }
 
     def _calculate_dynamic_risk(self, conf: float, params: Params) -> float:
-        """
-        Dynamic position sizing based on signal confidence.
-        Formula: risk = base_risk * (0.5 + confidence)
-        Scales from min_risk to max_risk based on confidence.
-        """
-        risk = params.base_risk_pct * (0.5 + conf)
+        """Dynamic position sizing: risk scales with confidence."""
+        normalized = conf / 0.70
+        risk = params.base_risk_pct * normalized
         return max(params.min_risk_pct, min(params.max_risk_pct, risk))
 
     def generate_signal(self, df: pd.DataFrame) -> Optional[Dict]:

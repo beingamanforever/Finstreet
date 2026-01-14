@@ -6,13 +6,22 @@ logger = logging.getLogger(__name__)
 
 
 def get_rolling_volatility(prices: pd.Series, span: int = 60) -> pd.Series:
+    """Rolling volatility using only past data. Expanding window for early periods."""
     returns = prices.pct_change()
-    return returns.rolling(window=span).std().bfill()
+    rolling_vol = returns.rolling(window=span).std()
+    expanding_vol = returns.expanding(min_periods=2).std()
+    rolling_vol = rolling_vol.fillna(expanding_vol)
+    if rolling_vol.iloc[0] != rolling_vol.iloc[0]:
+        rolling_vol.iloc[0] = 0.02
+    return rolling_vol
 
 
 def triple_barrier_labeling(df: pd.DataFrame, min_hold: int = 2, max_hold: int = 5, vol_mult: float = 2.0) -> pd.DataFrame:
-    prices = df["close"].values
-    n = len(prices)
+    """Triple-barrier labeling using intraday high/low for realistic barrier detection."""
+    closes = df["close"].values
+    highs = df["high"].values
+    lows = df["low"].values
+    n = len(closes)
     volatility = get_rolling_volatility(df["close"], span=20)
     threshold = vol_mult * volatility
 
@@ -26,29 +35,28 @@ def triple_barrier_labeling(df: pd.DataFrame, min_hold: int = 2, max_hold: int =
             touched.append("none")
             continue
 
-        start = prices[i]
+        start = closes[i]
         upper = start * (1 + threshold.iloc[i])
         lower = start * (1 - threshold.iloc[i])
 
         label, t1, barrier = 0, None, "timeout"
 
         for j in range(i + min_hold, min(i + max_hold + 1, n)):
-            curr = prices[j]
-            if curr >= upper:
+            if highs[j] >= upper:
                 label, t1, barrier = 1, j, "upper"
                 break
-            elif curr <= lower:
+            elif lows[j] <= lower:
                 label, t1, barrier = -1, j, "lower"
                 break
 
         if t1 is None:
             final_idx = min(i + max_hold, n - 1)
-            label = 1 if prices[final_idx] > start else -1
+            label = 1 if closes[final_idx] > start else -1
             t1 = final_idx
 
         labels.append(label)
         t1_indices.append(t1)
-        ret = (prices[t1] / start - 1) if t1 is not None else 0
+        ret = (closes[t1] / start - 1) if t1 is not None else 0
         returns.append(ret)
         touched.append(barrier)
 

@@ -1,7 +1,4 @@
-# Finstreet Trading System
-# Multi-stage build for optimized image size
-
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -24,10 +21,14 @@ COPY . .
 RUN mkdir -p data/raw data/processed models reports/figures
 
 ENV PYTHONUNBUFFERED=1
-ENV LOG_LEVEL=INFO
+ENV PYTHONDONTWRITEBYTECODE=1
 
-CMD ["python", "run.py", "all"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
 
-LABEL maintainer="finstreet"
-LABEL description="Finstreet Trading System"
-LABEL version="2.0"
+ENTRYPOINT ["python", "run.py"]
+CMD ["all"]
+
+LABEL org.opencontainers.image.title="Finstreet Trading System"
+LABEL org.opencontainers.image.version="2.0"
+LABEL org.opencontainers.image.description="ML-driven trend-following trading system for NSE equities"
