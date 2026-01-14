@@ -6,10 +6,12 @@
 
 *KSHITIJ 2026 · IIT Kharagpur*
 
-[![Build](https://github.com/beingamanforever/Finstreet/actions/workflows/sanity_check.yml/badge.svg)](https://github.com/beingamanforever/Finstreet/actions/workflows/sanity_check.yml)
+[![Strategy Audit](https://github.com/beingamanforever/Finstreet/actions/workflows/sanity_check.yml/badge.svg)](https://github.com/beingamanforever/Finstreet/actions/workflows/sanity_check.yml)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
 [![License](https://img.shields.io/badge/License-MIT-FFC107?style=for-the-badge)](LICENSE)
+
+</div>
 
 ---
 
