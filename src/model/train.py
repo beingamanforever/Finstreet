@@ -77,7 +77,11 @@ def train_model() -> Tuple[Optional[XGBClassifier], Optional[List[str]]]:
 
         acc = accuracy_score(y_test, y_pred)
         f1 = f1_score(y_test, y_pred, zero_division=0)
-        ll = log_loss(y_test, y_proba)
+        # Handle case where test fold has only one class
+        if len(np.unique(y_test)) > 1:
+            ll = log_loss(y_test, y_proba, labels=[0, 1])
+        else:
+            ll = float('nan')
         logger.info(f"Fold {fold}: Acc={acc:.3f}, F1={f1:.3f}, LogLoss={ll:.3f}")
 
     model.fit(X, y, sample_weight=weights, verbose=False)
