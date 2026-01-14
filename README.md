@@ -18,6 +18,8 @@
 |:--------:|:------------:|:------------:|:------------:|:-------------:|
 | **88.9%** | **6.62** | **1.31%** | **0.05%** | **29.27** |
 
+*9 trades · NSE:SONATSOFTW-EQ · Nov-Dec 2025 · INR 100,000 → INR 101,314*
+
 </div>
 
 ---
@@ -147,6 +149,7 @@ The `Dockerfile` provides:
 
 ```bash
 python run.py fetch      # Fetch data from FYERS API
+python run.py train      # Train XGBoost model only
 python run.py ensemble   # Train XGBoost + LightGBM ensemble
 python run.py backtest   # Run backtest simulation
 python run.py predict    # Generate Jan 1-8 predictions
@@ -176,8 +179,10 @@ python run.py all        # Full pipeline
 finstreet/
 ├── run.py                  # Entry point
 ├── audit_bias.py           # Data leakage verification
+├── sensitivity_analysis.py # Parameter robustness testing
 ├── Dockerfile              # Container configuration
 ├── setup.sh                # Local setup script
+├── requirements.txt        # Python dependencies
 ├── config/settings.py      # Configuration
 ├── src/
 │   ├── data/               # FYERS API integration
@@ -185,6 +190,8 @@ finstreet/
 │   ├── model/              # XGBoost + LightGBM ensemble
 │   ├── strategy/           # Trading logic
 │   ├── backtest/           # Simulation engine
+│   ├── forecast/           # Daily predictions
+│   ├── execution/          # Trade execution
 │   └── visualization/      # Chart generation
 ├── data/
 │   ├── raw/                # OHLCV from FYERS
