@@ -127,8 +127,8 @@ Only pullback shows sensitivity. Others invariant.
 \textbf{Control} & \textbf{Rule} \\
 \midrule
 Position Size & $\text{risk} = \text{base} \times (\text{conf} / 0.70)$ \\
-Max Risk & 5\% per trade \\
-Stop Loss & 1.5$\times$ ATR \\
+Max Position & 15\% of capital \\
+Stop Loss & 1.5$\times$ ATR (EOD exit if not hit) \\
 Take Profit & 3$\times$ ATR \\
 Trailing Stop & 2.5$\times$ ATR \\
 Regime Filter & ADX $<$ 15 $\rightarrow$ skip \\
@@ -159,16 +159,16 @@ Return & 1.31\% & Max DD & 0.05\% \\
 \begin{tabular}{@{}lcccc@{}}
 \textbf{Date} & \textbf{Signal} & \textbf{Dir} & \textbf{Conf} & \textbf{Regime} \\
 \midrule
-Jan 1 & HOLD & DOWN & 68\% & Uptrend \\
-Jan 2 & HOLD & DOWN & 68\% & Uptrend \\
-Jan 5 & HOLD & DOWN & 68\% & Uptrend \\
-Jan 6 & HOLD & DOWN & 68\% & Uptrend \\
-Jan 7 & HOLD & DOWN & 68\% & Uptrend \\
-Jan 8 & HOLD & DOWN & 68\% & Uptrend \\
+Jan 1 & HOLD & DOWN & 77.6\% & Uptrend \\
+Jan 2 & HOLD & DOWN & 77.6\% & Uptrend \\
+Jan 5 & HOLD & DOWN & 54.6\% & Transitional \\
+Jan 6 & HOLD & DOWN & 54.6\% & Uptrend Weak \\
+Jan 7 & HOLD & DOWN & 54.6\% & Transitional \\
+Jan 8 & HOLD & DOWN & 50.4\% & Transitional \\
 \end{tabular}
 
 \vspace{1pt}
-\textit{Model predicts DOWN but regime is Uptrend. Conservative approach: HOLD.}
+\textit{All HOLD: ML predicts DOWN but regime is bullish. Capital preservation.}
 \end{tcolorbox}
 
 \section{Data Integrity}

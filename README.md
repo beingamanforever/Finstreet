@@ -55,8 +55,8 @@ Prediction: Jan 1 - 8, 2026 (out-of-sample)
 | Control | Rule |
 |---------|------|
 | Position Size | `risk = base_risk * (confidence / 0.70)` |
-| Max Risk | 5% per trade |
-| Stop Loss | 1.5x ATR |
+| Max Position | 15% of capital |
+| Stop Loss | 1.5x ATR (EOD exit if not hit) |
 | Regime Filter | ADX < 15 → skip trade |
 | Signal Gate | Technical + ML must align |
 
@@ -74,6 +74,8 @@ Prediction: Jan 1 - 8, 2026 (out-of-sample)
 | Avg Win | INR 170 | Profit Factor | 29.27 |
 | Avg Loss | INR 46 | Max Drawdown | 0.05% |
 
+*All trades exited at EOD (daily bars); stop/target rarely reached intraday.*
+
 ### Equity Curve
 <img src="reports/figures/equity_drawdown_dual.png" width="800">
 
@@ -87,7 +89,7 @@ Prediction: Jan 1 - 8, 2026 (out-of-sample)
 
 <img src="reports/figures/confusion_matrix.png" width="450"> <img src="reports/figures/feature_importance.png" width="450">
 
-**Feature Importance Insight:** Volatility features dominate (ATR z-score: 39%, ATR percentile: 28%, returns_std: 20%). The model prioritizes *regime detection* over momentum signals identifying when volatility conditions favor trend continuation rather than predicting direction directly.
+**Feature Importance:** Volatility features dominate (ATR z-score: 39%, ATR percentile: 28%, returns_std: 20%). The model identifies *regime conditions* rather than predicting direction directly.
 
 ---
 
@@ -96,15 +98,15 @@ Prediction: Jan 1 - 8, 2026 (out-of-sample)
 | Date | Signal | Direction | Confidence | Regime |
 |:----:|:------:|:---------:|:----------:|:------:|
 | Jan 1 | HOLD | DOWN | 77.6% | Uptrend Strong |
-| Jan 2 | SELL | DOWN | 77.6% | Transitional |
-| Jan 5 | SELL | DOWN | 75.6% | Transitional |
-| Jan 6 | HOLD | DOWN | 54.6% | Transitional |
+| Jan 2 | HOLD | DOWN | 77.6% | Uptrend Strong |
+| Jan 5 | HOLD | DOWN | 54.6% | Transitional |
+| Jan 6 | HOLD | DOWN | 54.6% | Uptrend Weak |
 | Jan 7 | HOLD | DOWN | 54.6% | Transitional |
-| Jan 8 | HOLD | UP | 53.7% | Downtrend Strong |
+| Jan 8 | HOLD | DOWN | 50.4% | Transitional |
 
 <img src="reports/figures/predictions_chart.png" width="700">
 
-Model predicts directional bias with regime-aware signal generation. SELL signals in Transitional regimes align with momentum; HOLD signals in conflicting regimes (DOWN prediction in Uptrend) prioritize capital preservation.
+**Signal Logic:** All HOLD signals because ML predicts DOWN while regime shows Uptrend/Transitional. Conservative approach preserves capital rather than betting against trend.
 
 ---
 

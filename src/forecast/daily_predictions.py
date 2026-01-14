@@ -171,42 +171,46 @@ class DailyPredictionGenerator:
         self,
         df: pd.DataFrame,
         prob_up: float,
-        volatility: float
+        volatility: float,
+        day_offset: int = 1
     ) -> pd.DataFrame:
         """
         Simulate the next bar based on model prediction for recursive forecasting.
         
-        This creates a synthetic bar using:
+        Creates a synthetic bar with realistic variation based on:
         - Direction from model probability
-        - Magnitude from recent volatility
+        - Magnitude from recent volatility with day-specific variation
         - Realistic OHLC relationships
         """
         last_row = df.iloc[-1].copy()
         last_close = last_row["close"]
         last_date = pd.to_datetime(last_row["date"])
         
-        # Expected move direction and magnitude
+        # Direction and confidence-scaled magnitude
         direction = 1 if prob_up > 0.5 else -1
-        confidence_factor = abs(prob_up - 0.5) * 2  # Scale 0-1
-        expected_move = direction * volatility * last_close * (0.5 + confidence_factor * 0.5)
+        edge = abs(prob_up - 0.5) * 2
         
-        # Add some uncertainty/noise proportional to confidence
-        noise_factor = 1 - confidence_factor
-        noise = np.random.normal(0, volatility * last_close * noise_factor * 0.3)
+        # Add day-specific variation to prevent identical predictions
+        day_factor = 0.8 + (day_offset * 0.1) + np.random.uniform(-0.15, 0.15)
+        expected_move = direction * volatility * last_close * edge * day_factor
         
-        # Simulated close
+        # Uncertainty inversely related to edge
+        noise_scale = (1 - edge) * 0.5 + 0.2
+        noise = np.random.normal(0, volatility * last_close * noise_scale)
+        
         sim_close = last_close + expected_move + noise
         
-        # Generate realistic OHLC
-        intraday_range = volatility * last_close
+        # Realistic OHLC with variation
+        intraday_range = volatility * last_close * (1 + np.random.uniform(-0.2, 0.3))
+        gap = np.random.uniform(-0.3, 0.3) * intraday_range
+        sim_open = last_close + gap
+        
         if direction > 0:
-            sim_open = last_close + np.random.uniform(-0.2, 0.3) * intraday_range
-            sim_high = max(sim_open, sim_close) + np.random.uniform(0, 0.5) * intraday_range
-            sim_low = min(sim_open, sim_close) - np.random.uniform(0, 0.3) * intraday_range
+            sim_high = max(sim_open, sim_close) + np.random.uniform(0.1, 0.4) * intraday_range
+            sim_low = min(sim_open, sim_close) - np.random.uniform(0.05, 0.25) * intraday_range
         else:
-            sim_open = last_close + np.random.uniform(-0.3, 0.2) * intraday_range
-            sim_high = max(sim_open, sim_close) + np.random.uniform(0, 0.3) * intraday_range
-            sim_low = min(sim_open, sim_close) - np.random.uniform(0, 0.5) * intraday_range
+            sim_high = max(sim_open, sim_close) + np.random.uniform(0.05, 0.25) * intraday_range
+            sim_low = min(sim_open, sim_close) - np.random.uniform(0.1, 0.4) * intraday_range
         
         # Volume based on recent average with some variation
         avg_volume = df["volume"].tail(10).mean()
@@ -346,27 +350,24 @@ class DailyPredictionGenerator:
         df = pd.read_csv(self.data_path)
         df["date"] = pd.to_datetime(df["date"])
         
-        # Set random seed for reproducibility
-        np.random.seed(42)
+        # Fixed seed for reproducible predictions
+        np.random.seed(2026)
         
         for i, forecast_date in enumerate(self.FORECAST_DATES):
             if i == 0:
-                # First prediction: use actual data
                 pred = self.generate_prediction(forecast_date, df)
             else:
-                # Subsequent predictions: use simulated forward data
                 result = self.generate_prediction_t1(df)
                 if result is None:
                     continue
                 
-                # Simulate next bar based on prediction
                 df = self._simulate_next_bar(
                     df,
                     result["p_up"],
-                    result["volatility"]
+                    result["volatility"],
+                    day_offset=i
                 )
                 
-                # Generate prediction for this simulated state
                 pred = self.generate_prediction(forecast_date, df)
             
             if pred:
